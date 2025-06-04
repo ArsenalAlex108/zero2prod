@@ -7,9 +7,9 @@ use zero2prod::{configuration::get_configuration, startup};
 async fn main() -> std::io::Result<()> {
     let configuration = get_configuration().expect("Failed to find configuration file.");
     let connection_pool = PgPool::connect(&configuration.database.connection_string())
-    .await
-    .expect("");
+        .await
+        .expect("");
     TcpListener::bind(format!("127.0.0.1:{}", configuration.application_port))
-    .and_then(|i| startup::run(i, connection_pool))
-    ?.await
+        .and_then(|i| startup::run(i, connection_pool))?
+        .await
 }

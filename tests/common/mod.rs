@@ -1,7 +1,10 @@
-use sqlx::{Connection, PgConnection, PgPool, Executor};
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use uuid::Uuid;
-use zero2prod::{configuration::{get_configuration, DatabaseSettings}, startup};
+use zero2prod::{
+    configuration::{DatabaseSettings, get_configuration},
+    startup,
+};
 
 pub struct TestApp {
     pub address: String,
@@ -19,8 +22,7 @@ pub async fn spawn_app() -> TestApp {
 
     let address = format!("http://127.0.0.1:{}", port);
 
-    let connection_pool = configure_database(&configuration.database)
-        .await;
+    let connection_pool = configure_database(&configuration.database).await;
 
     startup::run(listener, connection_pool.clone())
         .map(tokio::spawn)

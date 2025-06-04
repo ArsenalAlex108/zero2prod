@@ -4,7 +4,7 @@ mod common;
 async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let app_address = common::spawn_app().await;
-    
+
     let client = reqwest::Client::new();
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     // Act
@@ -19,13 +19,12 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     assert_eq!(200, response.status().as_u16());
 
     let saved = sqlx::query!("SELECT email, name FROM subscriptions")
-    .fetch_one(&app_address.db_pool)
-    .await
-    .expect("Failed to fetch saved subscriptions.");
+        .fetch_one(&app_address.db_pool)
+        .await
+        .expect("Failed to fetch saved subscriptions.");
 
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
-
 }
 
 #[actix_rt::test]

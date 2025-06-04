@@ -1,7 +1,11 @@
 use std::net::TcpListener;
 
-use actix_web::{dev::Server, web::{self}, App, HttpServer};
-use sqlx::{PgPool};
+use actix_web::{
+    App, HttpServer,
+    dev::Server,
+    web::{self},
+};
+use sqlx::PgPool;
 
 use crate::routes::{health_check, subscribe};
 
@@ -11,7 +15,7 @@ pub fn run(listener: TcpListener, db_pool: PgPool) -> std::io::Result<Server> {
         App::new()
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(subscribe))
-            .app_data((&db_pool).clone())
+            .app_data(db_pool.clone())
     })
     .listen(listener)?
     .run();

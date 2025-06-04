@@ -1,8 +1,9 @@
 use actix_web::{
-    web::{self}, HttpResponse, Responder
+    HttpResponse, Responder,
+    web::{self},
 };
-use sqlx::{PgPool};
 use chrono::Utc;
+use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -31,7 +32,7 @@ pub async fn subscribe(
         |e| {
             println!("Query error: {e}");
             HttpResponse::InternalServerError().finish()
-        }, 
-        |_|HttpResponse::Ok().finish()
+        },
+        |_| HttpResponse::Ok().finish(),
     )
 }
