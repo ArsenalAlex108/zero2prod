@@ -6,6 +6,7 @@ use zero2prod::{
     startup,
 };
 
+#[allow(dead_code, reason = "Used by tests.")]
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
