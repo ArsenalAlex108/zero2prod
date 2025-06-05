@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use uuid::Uuid;
@@ -12,16 +13,37 @@ pub struct TestApp {
     pub db_pool: PgPool,
 }
 
+pub const TEST: &str = "test";
+pub const DEBUG: &str = "debug";
+pub const TEST_LOG: &str = "TEST_LOG";
+
+// TODO: Use trait impl instead.
+macro_rules! init_subscriber_from_env {
+    ($n: path) => {{
+        let subscriber = zero2prod::telemetry::get_subscriber(TEST.into(), DEBUG.into(), $n);
+        zero2prod::telemetry::init_subscriber(subscriber);
+    }};
+}
+
+static TRACING: Lazy<()> = Lazy::new(|| {
+    if std::env::var(TEST_LOG).is_ok() {
+        init_subscriber_from_env!(std::io::stdout)
+    } else {
+        init_subscriber_from_env!(std::io::sink)
+    }
+});
+
 /// Spinup an instance of our application
 /// and returns its address(i.e.http://localhost:XXXX)
 pub async fn spawn_app() -> TestApp {
+    Lazy::force(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to random port");
     let port = listener.local_addr().unwrap().port();
+    let address = format!("http://127.0.0.1:{}", port);
 
     let mut configuration = get_configuration().expect("Failed to read configuration");
     configuration.database.database_name = Uuid::new_v4().to_string();
-
-    let address = format!("http://127.0.0.1:{}", port);
 
     let connection_pool = configure_database(&configuration.database).await;
 

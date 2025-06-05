@@ -1,11 +1,11 @@
 use actix_web::{
-    web::{self}, HttpResponse, Responder
+    HttpResponse, Responder,
+    web::{self},
 };
 use chrono::Utc;
 use const_format::formatcp;
 use nameof::name_of;
 use sqlx::PgPool;
-use tracing_futures::Instrument;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -14,24 +14,34 @@ pub struct SubscribeFormData {
     pub name: String,
 }
 
+const SUBSCRIBE_INSTRUMENT_NAME: &str = formatcp!("Enter Route '{}':", name_of!(subscribe));
+
+#[tracing::instrument(
+    name = SUBSCRIBE_INSTRUMENT_NAME,
+    skip(form, pool),
+    fields(
+        subscriber_email = %form.email,
+        subscriber_name = %form.name
+    )
+)]
 pub async fn subscribe(
     form: web::Form<SubscribeFormData>,
     pool: web::Data<PgPool>,
 ) -> impl Responder {
-    let request_id = Uuid::new_v4();
-    
-    let request_span = tracing::info_span!(
-        formatcp!("Enter Route '{}':", name_of!(subscribe)),
-        %request_id,
-        subscriber_email = %form.email,
-        subscriber_name = %form.name
-    );
+    insert_subscriber(&form, &pool).await.map_or_else(
+        |_| HttpResponse::InternalServerError().finish(),
+        |_| HttpResponse::Ok().finish(),
+    )
+}
 
-    let _request_span_guard = request_span.enter();
+const INSERT_SUBSCRIBER_INSTRUMENT_NAME: &str =
+    formatcp!("Enter Route '{}':", name_of!(insert_subscriber));
 
-    let query_span = tracing::info_span!(
-        formatcp!("Saving subscriber in '{}':", name_of!(subscribe))
-    );
+#[tracing::instrument(
+    name = INSERT_SUBSCRIBER_INSTRUMENT_NAME,
+    skip(form, pool)
+)]
+pub async fn insert_subscriber(form: &SubscribeFormData, pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
@@ -42,17 +52,8 @@ pub async fn subscribe(
         form.name,
         Utc::now()
     )
-    .execute(pool.get_ref())
-    .instrument(query_span)
+    .execute(pool)
     .await
-    .map_or_else(
-        |e| {
-            tracing::error!("Query error in {}: {:?}", name_of!(subscribe), e);
-            HttpResponse::InternalServerError().finish()
-        },
-        |_| {
-            tracing::info!("Success: {}", name_of!(subscribe));
-            HttpResponse::Ok().finish() 
-        },
-    )
+    .inspect_err(|e| tracing::error!("Query error in {}: {:?}", name_of!(insert_subscriber), e))?;
+    Ok(())
 }
