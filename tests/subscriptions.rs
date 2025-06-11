@@ -1,7 +1,8 @@
 mod common;
 
 #[actix_rt::test]
-async fn subscribe_returns_a_200_for_valid_form_data() {
+async fn subscribe_returns_a_200_for_valid_form_data()
+ {
     // Arrange
     let app_address = common::spawn_app().await;
 
@@ -9,8 +10,14 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     // Act
     let response = client
-        .post(format!("{}/subscriptions", &app_address.address))
-        .header("Content-Type", "application/x-www-form-urlencoded")
+        .post(format!(
+            "{}/subscriptions",
+            &app_address.address
+        ))
+        .header(
+            "Content-Type",
+            "application/x-www-form-urlencoded",
+        )
         .body(body)
         .send()
         .await
@@ -24,23 +31,34 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     )
     .fetch_one(&app_address.db_pool)
     .await
-    .expect("Failed to fetch saved subscriptions.");
+    .expect(
+        "Failed to fetch saved subscriptions.",
+    );
 
-    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(
+        saved.email,
+        "ursula_le_guin@gmail.com"
+    );
     assert_eq!(saved.name, "le guin");
 }
 
 #[actix_rt::test]
-async fn subscribe_returns_a_400_when_data_is_missing() {
+async fn subscribe_returns_a_400_when_data_is_missing()
+ {
     // Arrange
     let app_address = common::spawn_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
         ("name=le%20guin", "missing the email"),
-        ("email=ursula_le_guin%40gmail.com", "missing the name"),
+        (
+            "email=ursula_le_guin%40gmail.com",
+            "missing the name",
+        ),
         ("", "missing both name and email"),
     ];
-    for (invalid_body, error_message) in test_cases {
+    for (invalid_body, error_message) in
+        test_cases
+    {
         // Act
         let response = client
             .post(format!("{}/subscriptions", &app_address.address))
@@ -61,14 +79,21 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 }
 
 #[actix_rt::test]
-async fn subscribe_returns_a_400_when_fields_are_present_but_empty() {
+async fn subscribe_returns_a_400_when_fields_are_present_but_empty()
+ {
     // Arrange
     let app = common::spawn_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
-        ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
+        (
+            "name=&email=ursula_le_guin%40gmail.com",
+            "empty name",
+        ),
         ("name=Ursula&email=", "empty email"),
-        ("name=Ursula&email=definitely-not-an-email", "invalid email"),
+        (
+            "name=Ursula&email=definitely-not-an-email",
+            "invalid email",
+        ),
     ];
     for (body, description) in test_cases {
         // Act

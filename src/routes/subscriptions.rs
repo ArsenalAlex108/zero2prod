@@ -1,8 +1,13 @@
 use std::convert::identity;
 
-use crate::domain::{
-    NewSubscriber, SubscriberEmail, SubscriberEmailParseError, SubscriberName,
-    SubscriberNameParseError,
+use crate::{
+    domain::{
+        NewSubscriber, NewSubscriberParseError,
+        SubscriberEmail,
+        SubscriberEmailParseError,
+        SubscriberName, SubscriberNameParseError,
+    },
+    hkt::{RcHKT, SharedPointerHKT},
 };
 use actix_web::{
     HttpResponse, Responder,
@@ -13,6 +18,7 @@ use const_format::formatcp;
 use kust::ScopeFunctions;
 use nameof::name_of;
 use sqlx::PgPool;
+use std::ops::Deref;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
@@ -21,7 +27,10 @@ pub struct SubscribeFormData {
     pub name: String,
 }
 
-const SUBSCRIBE_INSTRUMENT_NAME: &str = formatcp!("Enter Route '{}':", name_of!(subscribe));
+const SUBSCRIBE_INSTRUMENT_NAME: &str = formatcp!(
+    "Enter Route '{}':",
+    name_of!(subscribe)
+);
 
 #[tracing::instrument(
     name = SUBSCRIBE_INSTRUMENT_NAME,
@@ -35,17 +44,33 @@ pub async fn subscribe(
     form: web::Form<SubscribeFormData>,
     pool: web::Data<PgPool>,
 ) -> impl Responder {
-    let subscriber_parse_result = SubscriberName::parse(form.0.name)
-        .map_err(SubscribeError::from)
-        .and_then(|name| {
-            SubscriberEmail::parse(form.0.email)
-                .map(|email| NewSubscriber { email, name })
-                .map_err(SubscribeError::from)
-        });
+    subscribe_with_shared_pointer::<RcHKT>(
+        form, pool,
+    )
+    .await
+}
+
+#[tracing::instrument(
+    name = SUBSCRIBE_INSTRUMENT_NAME,
+    skip(form, pool),
+    fields(
+        subscriber_email = %form.email,
+        subscriber_name = %form.name
+    )
+)]
+pub async fn subscribe_with_shared_pointer<
+    P: SharedPointerHKT,
+>(
+    form: web::Form<SubscribeFormData>,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    let subscriber_parse_result =
+        NewSubscriber::try_from(form.0)
+            .map_err(SubscribeError::from);
 
     subscriber_parse_result
         .map(async |subscriber| {
-            insert_subscriber(&subscriber, &pool)
+            insert_subscriber::<P>(&subscriber, &pool)
                 .await
                 .map_err(SubscribeError::from)
         })
@@ -57,44 +82,51 @@ pub async fn subscribe(
             use SubscribeError as E;
             match i {
                 Ok(_) => HttpResponse::Ok().finish(),
-                Err(E::SubscriberName(_)) | Err(E::SubscriberEmail(_)) => {
+                Err(E::NewSubscriberParseError(_)) => {
                     HttpResponse::BadRequest().finish()
                 }
-                Err(E::Sqlx(_)) => HttpResponse::InternalServerError().finish(),
+                Err(E::SqlxError(_)) => HttpResponse::InternalServerError().finish(),
             }
         })
 }
 
 #[derive(Debug, thiserror::Error)]
 enum SubscribeError {
-    #[error("{name}: {0}", name = name_of!(type SubscriberNameParseError))]
-    SubscriberName(#[from] SubscriberNameParseError),
-    #[error("{name}: {0}", name = name_of!(type SubscriberEmailParseError))]
-    SubscriberEmail(#[from] SubscriberEmailParseError),
+    #[error("{name}: {0}", name = name_of!(type NewSubscriberParseError))]
+    NewSubscriberParseError(
+        #[from] NewSubscriberParseError,
+    ),
     #[error("Sqlx Error: {0}")]
-    Sqlx(#[from] sqlx::Error),
+    SqlxError(#[from] sqlx::Error),
 }
 
-const INSERT_SUBSCRIBER_INSTRUMENT_NAME: &str =
-    formatcp!("Enter Route '{}':", name_of!(insert_subscriber));
+const INSERT_SUBSCRIBER_INSTRUMENT_NAME: &str = formatcp!(
+    "Enter Route '{}':",
+    stringify!(insert_subscriber)
+);
 
 #[tracing::instrument(
     name = INSERT_SUBSCRIBER_INSTRUMENT_NAME,
     skip(form, pool)
 )]
-pub async fn insert_subscriber(form: &NewSubscriber, pool: &PgPool) -> Result<(), sqlx::Error> {
+pub async fn insert_subscriber<
+    P: SharedPointerHKT,
+>(
+    form: &NewSubscriber<P>,
+    pool: &PgPool,
+) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
         "#,
         Uuid::new_v4(),
-        form.email.as_str(),
-        form.name.as_str(),
+        form.email.deref(),
+        form.name.deref(),
         Utc::now()
     )
     .execute(pool)
     .await
-    .inspect_err(|e| tracing::error!("Query error in {}: {:?}", name_of!(insert_subscriber), e))?;
+    .inspect_err(|e| tracing::error!("Query error in {}: {:?}", stringify!(insert_subscriber), e))?;
     Ok(())
 }
