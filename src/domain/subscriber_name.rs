@@ -1,10 +1,7 @@
 use std::ops::Deref;
 
 use crate::{
-    domain::macros::{
-        define_enum_derived,
-        define_string_newtype_derived,
-    },
+    domain::macros::define_enum_derived,
     hkt::{K1, SharedPointerHKT},
 };
 use kust::ScopeFunctions;

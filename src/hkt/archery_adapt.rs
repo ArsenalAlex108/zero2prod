@@ -7,15 +7,15 @@ use std::{
 
 use crate::hkt;
 
-pub mod bespoke {
-    pub trait From<T>: Sized {
-        fn from(value: T) -> Self;
-    }
+// pub mod bespoke {
+//     pub trait From<T>: Sized {
+//         fn from(value: T) -> Self;
+//     }
 
-    pub trait Into<T>: Sized {
-        fn into(self) -> T;
-    }
-}
+//     pub trait Into<T>: Sized {
+//         fn into(self) -> T;
+//     }
+// }
 
 #[derive(Debug, derive_more::Display)]
 pub enum ArcHKT {}
@@ -52,77 +52,77 @@ pub trait SharedPointerHKT:
     ) -> Self::T<T>;
 }
 
-// pub struct SharedPointer<T>(T);
+// // pub struct SharedPointer<T>(T);
 
-// impl<P: HKT1Unsized, A: ?Sized> Clone for SharedPointer<P::T<A>> {
+// // impl<P: HKT1Unsized, A: ?Sized> Clone for SharedPointer<P::T<A>> {
 
+// // }
+
+// pub trait SharedPointerExt<
+//     P: SharedPointerHKT,
+//     A: ?Sized,
+// > where
+//     Self: Into<P::T<A>>,
+// {
+//     fn as_ref(&self) -> &A;
+//     fn newtype(self) -> K1<P, A>;
+//     fn into_k<K: Into<P::T<A>>>(self)
+//     -> K1<P, A>;
+//     fn from_k<K: From<P::T<A>>>(self) -> K
+//     where
+//         Self: Sized;
+
+//     fn p<P2: HKT1Unsized>(self) -> K1<P2, A>
+//     where
+//         P2::T<A>: From<P::T<A>>;
+
+//     fn pa<P2: HKT1Unsized, A2: ?Sized>(
+//         self,
+//     ) -> K1<P2, A2>
+//     where
+//         P2::T<A2>: From<P::T<A>>;
 // }
 
-pub trait SharedPointerExt<
-    P: SharedPointerHKT,
-    A: ?Sized,
-> where
-    Self: Into<P::T<A>>,
-{
-    fn as_ref(&self) -> &A;
-    fn newtype(self) -> K1<P, A>;
-    fn into_k<K: Into<P::T<A>>>(self)
-    -> K1<P, A>;
-    fn from_k<K: From<P::T<A>>>(self) -> K
-    where
-        Self: Sized;
+// impl<P: SharedPointerHKT, A: ?Sized>
+//     SharedPointerExt<P, A> for P::T<A>
+// {
+//     fn as_ref(&self) -> &A {
+//         P::deref(&self)
+//     }
 
-    fn p<P2: HKT1Unsized>(self) -> K1<P2, A>
-    where
-        P2::T<A>: From<P::T<A>>;
+//     fn newtype(self) -> K1<P, A> {
+//         K1(self)
+//     }
 
-    fn pa<P2: HKT1Unsized, A2: ?Sized>(
-        self,
-    ) -> K1<P2, A2>
-    where
-        P2::T<A2>: From<P::T<A>>;
-}
+//     fn into_k<K: Into<P::T<A>>>(
+//         self,
+//     ) -> K1<P, A> {
+//         K1(self)
+//     }
 
-impl<P: SharedPointerHKT, A: ?Sized>
-    SharedPointerExt<P, A> for P::T<A>
-{
-    fn as_ref(&self) -> &A {
-        P::deref(&self)
-    }
+//     fn from_k<K: From<P::T<A>>>(self) -> K
+//     where
+//         Self: Sized,
+//     {
+//         K::from(self.into())
+//     }
 
-    fn newtype(self) -> K1<P, A> {
-        K1(self)
-    }
+//     fn p<P2: HKT1Unsized>(self) -> K1<P2, A>
+//     where
+//         P2::T<A>: From<P::T<A>>,
+//     {
+//         K1(P2::T::<A>::from(self.into()))
+//     }
 
-    fn into_k<K: Into<P::T<A>>>(
-        self,
-    ) -> K1<P, A> {
-        K1(self)
-    }
-
-    fn from_k<K: From<P::T<A>>>(self) -> K
-    where
-        Self: Sized,
-    {
-        K::from(self.into())
-    }
-
-    fn p<P2: HKT1Unsized>(self) -> K1<P2, A>
-    where
-        P2::T<A>: From<P::T<A>>,
-    {
-        K1(P2::T::<A>::from(self.into()))
-    }
-
-    fn pa<P2: HKT1Unsized, A2: ?Sized>(
-        self,
-    ) -> K1<P2, A2>
-    where
-        P2::T<A2>: From<P::T<A>>,
-    {
-        K1(P2::T::<A2>::from(self.into()))
-    }
-}
+//     fn pa<P2: HKT1Unsized, A2: ?Sized>(
+//         self,
+//     ) -> K1<P2, A2>
+//     where
+//         P2::T<A2>: From<P::T<A>>,
+//     {
+//         K1(P2::T::<A2>::from(self.into()))
+//     }
+// }
 
 /// New type wrapper for P::T<A> of HKT P
 #[derive(derive_more::Display)]
@@ -134,39 +134,21 @@ pub fn newtype<P: HKT1Unsized, A: ?Sized>(
     K1(value)
 }
 
-pub fn newtype_t<P: HKT1Unsized, A: ?Sized>(
-    value: impl bespoke::Into<K1<P, A>>,
-) -> K1<P, A> {
-    value.into()
-}
+// fn rc_clone_safety_test() {
+//     use kust::ScopeFunctions;
+//     let boxed = RcHKT::new(1).using(Box::new);
+//     let rc_cloned = boxed
+//         .deref()
+//         .clone()
+//         .inner()
+//         .using(Box::new);
+//     let mapped = boxed
+//         .using(|i| *i)
+//         .inner()
+//         .using(Box::new);
 
-fn newtype_test_p<P: HKT1Unsized, A: ?Sized>(
-    value: P::T<A>,
-) -> K1<P, A> {
-    newtype_t(value)
-}
-
-fn newtype_test_k<P: HKT1Unsized, A: ?Sized>(
-    value: K1<P, A>,
-) -> K1<P, A> {
-    newtype_t(value.inner())
-}
-
-fn rc_clone_safety_test() {
-    use kust::ScopeFunctions;
-    let boxed = RcHKT::new(1).using(Box::new);
-    let rc_cloned = boxed
-        .deref()
-        .clone()
-        .inner()
-        .using(Box::new);
-    let mapped = boxed
-        .using(|i| *i)
-        .inner()
-        .using(Box::new);
-
-    // Can't avoid cloning T in Result<T,E>
-}
+//     // Can't avoid cloning T in Result<T,E>
+// }
 
 // impl<P: HKT1Unsized, A: ?Sized> bespoke::From<K1<P,A>> for P::T<A> {
 //     fn from(value: K1<P,A>) -> Self {
@@ -174,21 +156,21 @@ fn rc_clone_safety_test() {
 //     }
 // }
 
-impl<P: HKT1Unsized, A: ?Sized>
-    bespoke::From<P::T<A>> for K1<P, A>
-{
-    fn from(value: P::T<A>) -> Self {
-        K1(value)
-    }
-}
+// impl<P: HKT1Unsized, A: ?Sized>
+//     bespoke::From<P::T<A>> for K1<P, A>
+// {
+//     fn from(value: P::T<A>) -> Self {
+//         K1(value)
+//     }
+// }
 
-impl<P: HKT1Unsized, A: ?Sized>
-    bespoke::Into<K1<P, A>> for P::T<A>
-{
-    fn into(self) -> K1<P, A> {
-        K1(self)
-    }
-}
+// impl<P: HKT1Unsized, A: ?Sized>
+//     bespoke::Into<K1<P, A>> for P::T<A>
+// {
+//     fn into(self) -> K1<P, A> {
+//         K1(self)
+//     }
+// }
 
 impl<P: HKT1Unsized, A: ?Sized> K1<P, A> {
     pub fn inner(self) -> P::T<A> {
@@ -207,10 +189,10 @@ impl<P: HKT1Unsized, A: ?Sized> K1<P, A> {
         K1(value)
     }
 }
-pub trait SharedPointerK1<P: SharedPointerHKT, A>:
-    Deref<Target = A> + AsRef<A> + Clone
-{
-}
+// pub trait SharedPointerK1<P: SharedPointerHKT, A>:
+//     Deref<Target = A> + AsRef<A> + Clone
+// {
+// }
 
 impl<P: SharedPointerHKT, A: ?Sized> Deref
     for K1<P, A>
@@ -332,11 +314,6 @@ impl<
         A::deserialize::<D>(deserializer)
             .map(P::new)
     }
-}
-
-impl<A, P: SharedPointerHKT> SharedPointerK1<P, A>
-    for K1<P, A>
-{
 }
 
 impl HKT1 for ArcHKT {

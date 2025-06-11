@@ -1,4 +1,4 @@
-use crate::hkt::{HKT1Unsized, K1};
+use crate::hkt::HKT1Unsized;
 
 pub trait Debug: HKT1Unsized {
     fn fmt_k<A: ?Sized + std::fmt::Debug>(

@@ -3,9 +3,6 @@ use std::convert::identity;
 use crate::{
     domain::{
         NewSubscriber, NewSubscriberParseError,
-        SubscriberEmail,
-        SubscriberEmailParseError,
-        SubscriberName, SubscriberNameParseError,
     },
     hkt::{RcHKT, SharedPointerHKT},
 };

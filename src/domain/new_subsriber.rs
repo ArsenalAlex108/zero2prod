@@ -5,10 +5,9 @@ use crate::{
         macros::define_enum_derived,
         subscriber_email::SubscriberEmail,
     },
-    hkt::{K1, SharedPointerHKT},
+    hkt::SharedPointerHKT,
     routes::SubscribeFormData,
 };
-use std::ops::Deref;
 
 #[derive(
     Debug,
