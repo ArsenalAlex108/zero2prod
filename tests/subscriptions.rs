@@ -1,8 +1,13 @@
+use reqwest::Client;
+use uuid::Uuid;
+
+use crate::common::TestApp;
+
 mod common;
 
 #[actix_rt::test]
 async fn subscribe_returns_a_200_for_valid_form_data()
- {
+{
     // Arrange
     let app_address = common::spawn_app().await;
 
@@ -112,4 +117,40 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty()
             description
         );
     }
+}
+
+#[actix_rt::test]
+async fn confirm_subscription_token_returns_200_with_correct_token() {
+    let (app, client) = arrange().await;
+    let token = Uuid::new_v4();
+    let response = client
+    .get(format!("{}/subscriptions/confirm", &app.address))
+    .header("Content-Type", "application/x-www-form-urlencoded")
+    .body(format!("subscription_token={}", token))
+    .send()
+    .await
+    .expect("Failed to execute request.");
+
+    assert_eq!(200, response.status().as_u16(),
+"The API did not return a 400 Bad Request when the subscription_token is correct");
+}
+
+#[actix_rt::test]
+async fn confirm_subscription_token_returns_401_with_correct_token() {
+    let (app, client) = arrange().await;
+    let token = Uuid::new_v4();
+    let response = client
+    .get(format!("{}/subscriptions/confirm", &app.address))
+    .header("Content-Type", "application/x-www-form-urlencoded")
+    .body(format!("subscription_token={}", token))
+    .send()
+    .await
+    .expect("Failed to execute request.");
+
+    assert_eq!(401, response.status().as_u16(),
+"The API did not return a 401 Unauthorized when the subscription_token is incorrect");
+}
+
+async fn arrange() -> (TestApp, Client) {
+    (common::spawn_app().await, reqwest::Client::new())
 }

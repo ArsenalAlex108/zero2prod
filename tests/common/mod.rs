@@ -1,15 +1,17 @@
+use kust::ScopeFunctions;
 use once_cell::sync::Lazy;
+use reqwest::Client;
 use sqlx::{
-    Connection, Executor, PgConnection, PgPool,
+    database, Connection, Executor, PgConnection, PgPool
 };
-use std::net::TcpListener;
+use std::{net::TcpListener, sync::Arc};
 use uuid::Uuid;
 use zero2prod::{
     configuration::{
-        DatabaseSettings, get_configuration,
-    },
-    startup,
+        get_configuration, DatabaseSettings
+    }, domain::SubscriberEmail, email_client::EmailClient, hkt::{ArcHKT, BoxHKT, RefHKT, K1}, startup
 };
+use std::ops::Deref;
 
 #[allow(dead_code, reason = "Used by tests.")]
 pub struct TestApp {
@@ -58,19 +60,32 @@ pub async fn spawn_app() -> TestApp {
     let address =
         format!("http://127.0.0.1:{}", port);
 
-    let mut configuration = get_configuration()
+    let configuration = get_configuration::<BoxHKT>()
         .expect("Failed to read configuration");
-    configuration.database.database_name =
-        Uuid::new_v4().to_string();
+
+    let database = DatabaseSettings::<BoxHKT> {
+        database_name:Uuid::new_v4().to_string().using(Box::<str>::from).using(BoxHKT::from_box),
+        ..configuration.database
+    };
 
     let connection_pool = configure_database(
-        &configuration.database,
+        &database,
     )
     .await;
 
-    startup::run(
+    fn run<P: RefHKT>(i: TcpListener, connection_pool: sqlx::Pool<sqlx::Postgres>) -> Result<actix_web::dev::Server, std::io::Error>
+    where P::T<str> : Send + Sync,
+        P::T<Client> : Send + Sync
+    {
+        startup::run::<P>(i, connection_pool, EmailClient::new(
+            Box::<str>::from("").using(P::from_box),
+            SubscriberEmail::try_from(Box::<str>::from("ursula_le_guin@gmail.com").using(P::from_box)).unwrap()
+        ))
+    }
+
+    run::<BoxHKT>(
         listener,
-        connection_pool.clone(),
+        connection_pool.clone()
     )
     .map(tokio::spawn)
     .expect("Failed to start server.");
@@ -81,8 +96,8 @@ pub async fn spawn_app() -> TestApp {
     }
 }
 
-pub async fn configure_database(
-    config: &DatabaseSettings,
+pub async fn configure_database<P: RefHKT>(
+    config: &DatabaseSettings<P>,
 ) -> PgPool {
     // Create database
     let mut connection =
@@ -95,7 +110,7 @@ pub async fn configure_database(
         .execute(
             format!(
                 r#"CREATE DATABASE "{}";"#,
-                config.database_name
+                config.database_name.deref()
             )
             .as_str(),
         )

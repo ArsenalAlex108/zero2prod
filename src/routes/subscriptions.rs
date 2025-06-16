@@ -56,7 +56,7 @@ pub async fn subscribe(
     )
 )]
 pub async fn subscribe_with_shared_pointer<
-    P: SharedPointerHKT,
+    P: SharedPointerHKT
 >(
     form: web::Form<SubscribeFormData>,
     pool: web::Data<PgPool>,
@@ -126,4 +126,13 @@ pub async fn insert_subscriber<
     .await
     .inspect_err(|e| tracing::error!("Query error in {}: {:?}", stringify!(insert_subscriber), e))?;
     Ok(())
+}
+
+pub async fn confirm_subscription_token<
+    P: SharedPointerHKT
+>(
+    form: web::Form<Uuid>,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    HttpResponse::Unauthorized().finish()
 }

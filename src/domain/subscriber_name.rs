@@ -2,11 +2,12 @@ use std::ops::Deref;
 
 use crate::{
     domain::macros::define_enum_derived,
-    hkt::{K1, SharedPointerHKT},
+    hkt::{K1, SharedPointerHKT, RefHKT},
 };
 use kust::ScopeFunctions;
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Deserialization will panic if invariants are not satisfied.
 #[derive(
     Debug,
     Hash,
@@ -15,10 +16,11 @@ use unicode_segmentation::UnicodeSegmentation;
     PartialOrd,
     Ord,
     serde::Serialize,
+    derive_more::Into,
     derive_more::AsRef,
     derive_more::Display,
 )]
-pub struct SubscriberName<P: SharedPointerHKT>(
+pub struct SubscriberName<P:RefHKT>(
     K1<P, str>,
 );
 
@@ -28,7 +30,7 @@ const SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS:
     '/', '(', ')', '"', '<', '>', '\\', '{', '}',
 ];
 
-impl<P: SharedPointerHKT> SubscriberName<P> {
+impl<P: RefHKT> SubscriberName<P> {
     pub fn parse(
         s: P::T<str>,
     ) -> Result<
@@ -72,7 +74,7 @@ impl<P: SharedPointerHKT> SubscriberName<P> {
     }
 }
 
-impl<P: SharedPointerHKT> Deref
+impl<P: RefHKT> Deref
     for SubscriberName<P>
 {
     type Target = str;
@@ -82,7 +84,13 @@ impl<P: SharedPointerHKT> Deref
     }
 }
 
-impl<P: SharedPointerHKT> TryFrom<&str>
+impl<P: SharedPointerHKT> Clone for SubscriberName<P> {
+    fn clone(&self) -> Self {
+        Self(P::clone(&self.0.inner_ref()))
+    }
+}
+
+impl<P: RefHKT> TryFrom<&str>
     for SubscriberName<P>
 {
     type Error = SubscriberNameParseError;
@@ -98,7 +106,7 @@ impl<P: SharedPointerHKT> TryFrom<&str>
     }
 }
 
-impl<P: SharedPointerHKT> TryFrom<String>
+impl<P: RefHKT> TryFrom<String>
     for SubscriberName<P>
 {
     type Error = SubscriberNameParseError;
@@ -113,7 +121,7 @@ impl<P: SharedPointerHKT> TryFrom<String>
     }
 }
 
-impl<P: SharedPointerHKT> TryFrom<K1<P, str>>
+impl<P: RefHKT> TryFrom<K1<P, str>>
     for SubscriberName<P>
 {
     type Error = SubscriberNameParseError;
@@ -125,7 +133,8 @@ impl<P: SharedPointerHKT> TryFrom<K1<P, str>>
     }
 }
 
-impl<'de, P: SharedPointerHKT>
+/// Do not let deserialized data bypass invariants.
+impl<'de, P: RefHKT>
     serde::Deserialize<'de>
     for SubscriberName<P>
 {
@@ -135,7 +144,7 @@ impl<'de, P: SharedPointerHKT>
     where
         D: serde::Deserializer<'de>,
     {
-        K1::<P, String>::deserialize(deserializer).map(|i|SubscriberName::try_from(i.deref().as_str()).expect("Deserialized data satisfy invariants."))
+        K1::<P, str>::deserialize(deserializer).map(|i|SubscriberName::try_from(i.deref()).expect("Deserialized data are expected to satisfy invariants. Panic occurred because D::Error is opaque."))
     }
 }
 

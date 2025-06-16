@@ -5,10 +5,11 @@ use crate::{
         macros::define_enum_derived,
         subscriber_email::SubscriberEmail,
     },
-    hkt::SharedPointerHKT,
+    hkt::{RefHKT, SharedPointerHKT},
     routes::SubscribeFormData,
 };
 
+/// Deserialization will panic if invariants are not satisfied.
 #[derive(
     Debug,
     Hash,
@@ -22,7 +23,7 @@ use crate::{
     serde::Deserialize,
 )]
 //#[display("{{\n email: {} \n name: {} \n}}", *email, *name)]
-pub struct NewSubscriber<P: SharedPointerHKT> {
+pub struct NewSubscriber<P: RefHKT> {
     pub email: SubscriberEmail<P>,
     pub name: SubscriberName<P>,
 }
@@ -36,7 +37,18 @@ define_enum_derived! {
     }
 }
 
-impl<P: SharedPointerHKT>
+impl<P: SharedPointerHKT> Clone
+    for NewSubscriber<P>
+{
+    fn clone(&self) -> Self {
+        NewSubscriber {
+            email: self.email.clone(),
+            name: self.name.clone(),
+        }
+    }
+}
+
+impl<P: RefHKT>
     TryFrom<SubscribeFormData>
     for NewSubscriber<P>
 {

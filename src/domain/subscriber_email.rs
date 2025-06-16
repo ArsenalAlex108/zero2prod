@@ -5,9 +5,10 @@ use validator::ValidateEmail;
 
 use crate::{
     domain::macros::define_enum_derived,
-    hkt::{K1, SharedPointerHKT},
+    hkt::{RefHKT, SharedPointerHKT, K1},
 };
 
+/// Deserialization will panic if invariants are not satisfied.
 #[derive(
     Hash,
     PartialEq,
@@ -19,12 +20,12 @@ use crate::{
     derive_more::AsRef,
     serde::Serialize,
 )]
-pub struct SubscriberEmail<P: SharedPointerHKT>(
+pub struct SubscriberEmail<P: RefHKT>(
     K1<P, str>,
 );
 
 // Just an example, derived impl is possible thanks to K1<P,str> : Debug
-impl<P: SharedPointerHKT> std::fmt::Debug
+impl<P: RefHKT> std::fmt::Debug
     for SubscriberEmail<P>
 {
     fn fmt(
@@ -39,7 +40,7 @@ impl<P: SharedPointerHKT> std::fmt::Debug
     }
 }
 
-impl<P: SharedPointerHKT> Deref
+impl<P: RefHKT> Deref
     for SubscriberEmail<P>
 {
     type Target = str;
@@ -49,7 +50,13 @@ impl<P: SharedPointerHKT> Deref
     }
 }
 
-impl<P: SharedPointerHKT> SubscriberEmail<P> {
+impl<P: SharedPointerHKT> Clone for SubscriberEmail<P> {
+    fn clone(&self) -> Self {
+        Self(P::clone(&self.0.inner_ref()))
+    }
+}
+
+impl<P: RefHKT> SubscriberEmail<P> {
     /// See also: try_from(K1<P,A>)
     pub fn parse(
         str: P::T<str>,
@@ -73,7 +80,7 @@ impl<P: SharedPointerHKT> SubscriberEmail<P> {
     }
 }
 
-impl<P: SharedPointerHKT> TryFrom<&str>
+impl<P: RefHKT> TryFrom<&str>
     for SubscriberEmail<P>
 {
     type Error = SubscriberEmailParseError;
@@ -88,7 +95,7 @@ impl<P: SharedPointerHKT> TryFrom<&str>
     }
 }
 
-impl<P: SharedPointerHKT> TryFrom<String>
+impl<P: RefHKT> TryFrom<String>
     for SubscriberEmail<P>
 {
     type Error = SubscriberEmailParseError;
@@ -103,7 +110,7 @@ impl<P: SharedPointerHKT> TryFrom<String>
     }
 }
 
-impl<P: SharedPointerHKT> TryFrom<K1<P, str>>
+impl<P: RefHKT> TryFrom<K1<P, str>>
     for SubscriberEmail<P>
 {
     type Error = SubscriberEmailParseError;
@@ -116,7 +123,7 @@ impl<P: SharedPointerHKT> TryFrom<K1<P, str>>
 }
 
 /// Do not let deserialized data bypass invariants.
-impl<'de, P: SharedPointerHKT>
+impl<'de, P: RefHKT>
     serde::Deserialize<'de>
     for SubscriberEmail<P>
 {
@@ -126,7 +133,7 @@ impl<'de, P: SharedPointerHKT>
     where
         D: serde::Deserializer<'de>,
     {
-        K1::<P, String>::deserialize(deserializer).map(|i|SubscriberEmail::try_from(i.deref().as_str()).expect("Deserialized data satisfy invariants."))
+        K1::<P, str>::deserialize(deserializer).map(|i|SubscriberEmail::try_from(i.deref()).expect("Deserialized data are expected to satisfy invariants. Panic occurred because D::Error is opaque."))
     }
 }
 

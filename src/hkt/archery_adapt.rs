@@ -17,24 +17,32 @@ use crate::hkt;
 //     }
 // }
 
-#[derive(Debug, derive_more::Display)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Display, serde::Serialize, serde::Deserialize)]
 pub enum ArcHKT {}
-#[derive(Debug, derive_more::Display)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Display, serde::Serialize, serde::Deserialize)]
 pub enum RcHKT {}
-pub trait HKT1Unsized:
-    Sized + std::fmt::Debug
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Display, serde::Serialize, serde::Deserialize)]
+pub enum BoxHKT {}
+
+pub trait Infallible : Sized + std::fmt::Debug + 'static + Eq + Ord
+{}
+
+pub trait HKT1Unsized: Infallible
 {
     type T<A: ?Sized>;
 }
-pub trait SharedPointerHKT:
-    HKT1Unsized + hkt::Debug
-{
+
+pub trait RefHKT : HKT1Unsized {
     fn new<T>(v: T) -> K1<Self, T>;
     fn from_box<T: ?Sized>(
         v: Box<T>,
     ) -> K1<Self, T>;
     fn deref<T: ?Sized>(value: &Self::T<T>)
     -> &T;
+}
+
+pub trait SharedPointerHKT: RefHKT
+{
     fn try_unwrap<T>(
         value: Self::T<T>,
     ) -> Result<T, Self::T<T>>;
@@ -49,7 +57,7 @@ pub trait SharedPointerHKT:
     ) -> usize;
     fn clone<T: ?Sized>(
         value: &Self::T<T>,
-    ) -> Self::T<T>;
+    ) -> K1<Self, T>;
 }
 
 // // pub struct SharedPointer<T>(T);
@@ -194,7 +202,7 @@ impl<P: HKT1Unsized, A: ?Sized> K1<P, A> {
 // {
 // }
 
-impl<P: SharedPointerHKT, A: ?Sized> Deref
+impl<P: RefHKT, A: ?Sized> Deref
     for K1<P, A>
 {
     type Target = A;
@@ -203,7 +211,7 @@ impl<P: SharedPointerHKT, A: ?Sized> Deref
     }
 }
 
-impl<P: SharedPointerHKT, A: ?Sized> AsRef<A>
+impl<P: RefHKT, A: ?Sized> AsRef<A>
     for K1<P, A>
 {
     fn as_ref(&self) -> &A {
@@ -215,12 +223,12 @@ impl<P: SharedPointerHKT, A: ?Sized> Clone
     for K1<P, A>
 {
     fn clone(&self) -> Self {
-        Self(P::clone(&self.0))
+        P::clone(&self.0)
     }
 }
 
 /// Consider adding PartialEqHKT to allow implementors to customize and/or optimize impl
-impl<P: SharedPointerHKT, A: ?Sized + PartialEq>
+impl<P: RefHKT, A: ?Sized + PartialEq>
     PartialEq for K1<P, A>
 {
     fn eq(&self, other: &Self) -> bool {
@@ -228,12 +236,12 @@ impl<P: SharedPointerHKT, A: ?Sized + PartialEq>
     }
 }
 
-impl<P: SharedPointerHKT, A: ?Sized + Eq> Eq
+impl<P: RefHKT, A: ?Sized + Eq> Eq
     for K1<P, A>
 {
 }
 
-impl<P: SharedPointerHKT, A: ?Sized + PartialOrd>
+impl<P: RefHKT, A: ?Sized + PartialOrd>
     PartialOrd for K1<P, A>
 {
     fn partial_cmp(
@@ -244,7 +252,7 @@ impl<P: SharedPointerHKT, A: ?Sized + PartialOrd>
     }
 }
 
-impl<P: SharedPointerHKT, A: ?Sized + Ord> Ord
+impl<P: RefHKT, A: ?Sized + Ord> Ord
     for K1<P, A>
 {
     fn cmp(
@@ -256,7 +264,7 @@ impl<P: SharedPointerHKT, A: ?Sized + Ord> Ord
 }
 
 impl<
-    P: SharedPointerHKT,
+    P: RefHKT,
     A: ?Sized + std::hash::Hash,
 > std::hash::Hash for K1<P, A>
 {
@@ -269,7 +277,7 @@ impl<
 }
 
 impl<
-    P: SharedPointerHKT,
+    P: RefHKT,
     A: ?Sized + std::fmt::Debug,
 > std::fmt::Debug for K1<P, A>
 {
@@ -284,7 +292,7 @@ impl<
 }
 
 impl<
-    P: SharedPointerHKT,
+    P: RefHKT,
     A: ?Sized + serde::ser::Serialize,
 > serde::ser::Serialize for K1<P, A>
 {
@@ -301,7 +309,7 @@ impl<
 
 impl<
     'de,
-    P: SharedPointerHKT,
+    P: RefHKT,
     A: ?Sized + serde::de::Deserialize<'de>,
 > serde::de::Deserialize<'de> for K1<P, A>
 {
@@ -314,6 +322,43 @@ impl<
         A::deserialize::<D>(deserializer)
             .map(P::new)
     }
+}
+
+impl<
+    'de,
+    P: RefHKT,
+    A: ?Sized + serde::de::Deserialize<'de>,
+> serde::de::Deserialize<'de> for K1<P, [A]>
+{
+    fn deserialize<D>(
+        deserializer: D,
+    ) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Box::<[A]>::deserialize::<D>(deserializer)
+            .map(P::from_box)
+    }
+}
+
+impl<
+    'de,
+    P: RefHKT
+> serde::de::Deserialize<'de> for K1<P, str>
+{
+    fn deserialize<D>(
+        deserializer: D,
+    ) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Box::<str>::deserialize::<D>(deserializer)
+            .map(P::from_box)
+    }
+}
+
+impl Infallible for ArcHKT {
+    
 }
 
 impl HKT1 for ArcHKT {
@@ -333,7 +378,7 @@ impl HKT1Unsized for ArcHKT {
     type T<A: ?Sized> = Arc<A>;
 }
 
-impl SharedPointerHKT for ArcHKT {
+impl RefHKT for ArcHKT {
     fn new<T>(v: T) -> K1<Self, T> {
         Arc::new(v).using(K1::newtype)
     }
@@ -348,7 +393,9 @@ impl SharedPointerHKT for ArcHKT {
     ) -> &T {
         value
     }
+}
 
+impl SharedPointerHKT for ArcHKT {
     fn try_unwrap<T>(
         value: Self::T<T>,
     ) -> Result<T, Self::T<T>> {
@@ -375,13 +422,17 @@ impl SharedPointerHKT for ArcHKT {
 
     fn clone<T: ?Sized>(
         value: &Self::T<T>,
-    ) -> Self::T<T> {
-        Arc::clone(value)
+    ) -> K1<Self, T> {
+        Arc::clone(value).using(K1::newtype)
     }
 }
 
 impl HKT1 for RcHKT {
     type T<A> = Rc<A>;
+}
+
+impl Infallible for RcHKT {
+    
 }
 
 impl hkt::Debug for RcHKT {
@@ -397,7 +448,8 @@ impl HKT1Unsized for RcHKT {
     type T<A: ?Sized> = Rc<A>;
 }
 
-impl SharedPointerHKT for RcHKT {
+impl RefHKT for RcHKT {
+    
     fn new<T>(v: T) -> K1<Self, T> {
         Rc::new(v).using(K1::newtype)
     }
@@ -413,6 +465,9 @@ impl SharedPointerHKT for RcHKT {
     ) -> &T {
         &value
     }
+}
+
+impl SharedPointerHKT for RcHKT {
 
     fn try_unwrap<T>(
         value: Self::T<T>,
@@ -440,8 +495,33 @@ impl SharedPointerHKT for RcHKT {
 
     fn clone<T: ?Sized>(
         value: &Self::T<T>,
-    ) -> Self::T<T> {
-        Rc::clone(value)
+    ) -> K1<Self, T> {
+        Rc::clone(value).using(K1::newtype)
+    }
+}
+
+impl Infallible for BoxHKT {
+
+}
+
+impl HKT1Unsized for BoxHKT {
+    type T<A: ?Sized> = Box<A>;
+}
+
+impl RefHKT for BoxHKT {
+    fn new<T>(v: T) -> K1<Self, T> {
+        K1::newtype(Box::new(v))
+    }
+
+    fn from_box<T: ?Sized>(
+        v: Box<T>,
+    ) -> K1<Self, T> {
+        K1::newtype(v)
+    }
+
+    fn deref<T: ?Sized>(value: &Self::T<T>)
+    -> &T {
+        value.deref()
     }
 }
 
@@ -463,7 +543,7 @@ mod tests {
         PointerK: super::SharedPointerHKT,
     {
         fn clone(&self) -> Self {
-            Self(PointerK::clone(&self.0))
+            Self(PointerK::clone(&self.0).inner())
         }
     }
 
