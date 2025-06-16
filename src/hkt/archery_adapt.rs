@@ -133,13 +133,26 @@ pub trait SharedPointerHKT: RefHKT
 // }
 
 /// New type wrapper for P::T<A> of HKT P
-#[derive(derive_more::Display)]
 pub struct K1<P: HKT1Unsized, A: ?Sized>(P::T<A>);
 
 pub fn newtype<P: HKT1Unsized, A: ?Sized>(
     value: P::T<A>,
 ) -> K1<P, A> {
     K1(value)
+}
+
+#[allow(unreachable_code)]
+#[automatically_derived]
+impl<P: HKT1Unsized, A: ?Sized> derive_more::core::fmt::Display for K1<P, A>
+where
+    A: derive_more::core::fmt::Display,
+{
+    fn fmt(
+        &self,
+        __derive_more_f: &mut derive_more::core::fmt::Formatter<'_>,
+    ) -> derive_more::core::fmt::Result {
+        derive_more::core::fmt::Display::fmt(self.deref(), __derive_more_f)
+    }
 }
 
 // fn rc_clone_safety_test() {

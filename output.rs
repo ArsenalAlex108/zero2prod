@@ -1,598 +1,72 @@
-pub mod configuration {
-    use config::Config;
-    use const_format::formatcp;
-    use naan::apply::Apply;
-    use naan::fun::F2Once;
-    use naan::semigroup::Semigroup;
+mod archery_adapt {
+    use kust::ScopeFunctions;
+    use naan::HKT1;
     use nameof::name_of;
-    use serde::de;
-    use serde_aux::field_attributes::deserialize_number_from_string;
-    use sqlx::ConnectOptions;
-    use sqlx::postgres::{PgConnectOptions, PgSslMode};
-    use std::convert::TryFrom;
-    use std::marker::PhantomData;
-    use tracing_log::log;
-    use crate::domain::{SubscriberEmail, SubscriberEmailParseError};
-    use crate::hkt::{K1, RefHKT, SharedPointerHKT, Validation, ValidationHKT};
-    use crate::serde::DeserializeError;
-    use crate::utils::{self, Pipe};
-    pub mod serde_impl {
-        use crate::hkt::RefHKT;
-        use crate::configuration::*;
-        /// #derive generated code with incorrect constraint P : serde::de::Deserialize<>
-        /// Below is generated code with above constraint removed.
-        #[doc(hidden)]
-        #[allow(
-            non_upper_case_globals,
-            unused_attributes,
-            unused_qualifications,
-            clippy::absolute_paths,
-        )]
-        const _: () = {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate serde as _serde;
-            #[automatically_derived]
-            impl<'de, P: RefHKT> _serde::Deserialize<'de> for Settings<P> {
-                fn deserialize<__D>(
-                    __deserializer: __D,
-                ) -> _serde::__private::Result<Self, __D::Error>
-                where
-                    __D: _serde::Deserializer<'de>,
-                {
-                    #[allow(non_camel_case_types)]
-                    #[doc(hidden)]
-                    enum __Field {
-                        __field0,
-                        __field1,
-                        __field2,
-                        __ignore,
-                    }
-                    #[doc(hidden)]
-                    struct __FieldVisitor;
-                    #[automatically_derived]
-                    impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
-                        type Value = __Field;
-                        fn expecting(
-                            &self,
-                            __formatter: &mut _serde::__private::Formatter,
-                        ) -> _serde::__private::fmt::Result {
-                            _serde::__private::Formatter::write_str(
-                                __formatter,
-                                "field identifier",
-                            )
-                        }
-                        fn visit_u64<__E>(
-                            self,
-                            __value: u64,
-                        ) -> _serde::__private::Result<Self::Value, __E>
-                        where
-                            __E: _serde::de::Error,
-                        {
-                            match __value {
-                                0u64 => _serde::__private::Ok(__Field::__field0),
-                                1u64 => _serde::__private::Ok(__Field::__field1),
-                                2u64 => _serde::__private::Ok(__Field::__field2),
-                                _ => _serde::__private::Ok(__Field::__ignore),
-                            }
-                        }
-                        fn visit_str<__E>(
-                            self,
-                            __value: &str,
-                        ) -> _serde::__private::Result<Self::Value, __E>
-                        where
-                            __E: _serde::de::Error,
-                        {
-                            match __value {
-                                "database" => _serde::__private::Ok(__Field::__field0),
-                                "application" => _serde::__private::Ok(__Field::__field1),
-                                "email_client" => _serde::__private::Ok(__Field::__field2),
-                                _ => _serde::__private::Ok(__Field::__ignore),
-                            }
-                        }
-                        fn visit_bytes<__E>(
-                            self,
-                            __value: &[u8],
-                        ) -> _serde::__private::Result<Self::Value, __E>
-                        where
-                            __E: _serde::de::Error,
-                        {
-                            match __value {
-                                b"database" => _serde::__private::Ok(__Field::__field0),
-                                b"application" => _serde::__private::Ok(__Field::__field1),
-                                b"email_client" => _serde::__private::Ok(__Field::__field2),
-                                _ => _serde::__private::Ok(__Field::__ignore),
-                            }
-                        }
-                    }
-                    #[automatically_derived]
-                    impl<'de> _serde::Deserialize<'de> for __Field {
-                        #[inline]
-                        fn deserialize<__D>(
-                            __deserializer: __D,
-                        ) -> _serde::__private::Result<Self, __D::Error>
-                        where
-                            __D: _serde::Deserializer<'de>,
-                        {
-                            _serde::Deserializer::deserialize_identifier(
-                                __deserializer,
-                                __FieldVisitor,
-                            )
-                        }
-                    }
-                    #[doc(hidden)]
-                    struct __Visitor<'de, P: RefHKT> {
-                        marker: _serde::__private::PhantomData<Settings<P>>,
-                        lifetime: _serde::__private::PhantomData<&'de ()>,
-                    }
-                    #[automatically_derived]
-                    impl<'de, P: RefHKT> _serde::de::Visitor<'de> for __Visitor<'de, P> {
-                        type Value = Settings<P>;
-                        fn expecting(
-                            &self,
-                            __formatter: &mut _serde::__private::Formatter,
-                        ) -> _serde::__private::fmt::Result {
-                            _serde::__private::Formatter::write_str(
-                                __formatter,
-                                "struct Settings",
-                            )
-                        }
-                        #[inline]
-                        fn visit_seq<__A>(
-                            self,
-                            mut __seq: __A,
-                        ) -> _serde::__private::Result<Self::Value, __A::Error>
-                        where
-                            __A: _serde::de::SeqAccess<'de>,
-                        {
-                            let __field0 = match _serde::de::SeqAccess::next_element::<
-                                DatabaseSettings<P>,
-                            >(&mut __seq)? {
-                                _serde::__private::Some(__value) => __value,
-                                _serde::__private::None => {
-                                    return _serde::__private::Err(
-                                        _serde::de::Error::invalid_length(
-                                            0usize,
-                                            &"struct Settings with 3 elements",
-                                        ),
-                                    );
-                                }
-                            };
-                            let __field1 = match _serde::de::SeqAccess::next_element::<
-                                ApplicationSettings<P>,
-                            >(&mut __seq)? {
-                                _serde::__private::Some(__value) => __value,
-                                _serde::__private::None => {
-                                    return _serde::__private::Err(
-                                        _serde::de::Error::invalid_length(
-                                            1usize,
-                                            &"struct Settings with 3 elements",
-                                        ),
-                                    );
-                                }
-                            };
-                            let __field2 = match _serde::de::SeqAccess::next_element::<
-                                EmailClientSettings<P>,
-                            >(&mut __seq)? {
-                                _serde::__private::Some(__value) => __value,
-                                _serde::__private::None => {
-                                    return _serde::__private::Err(
-                                        _serde::de::Error::invalid_length(
-                                            2usize,
-                                            &"struct Settings with 3 elements",
-                                        ),
-                                    );
-                                }
-                            };
-                            _serde::__private::Ok(Settings {
-                                database: __field0,
-                                application: __field1,
-                                email_client: __field2,
-                            })
-                        }
-                        #[inline]
-                        fn visit_map<__A>(
-                            self,
-                            mut __map: __A,
-                        ) -> _serde::__private::Result<Self::Value, __A::Error>
-                        where
-                            __A: _serde::de::MapAccess<'de>,
-                        {
-                            let mut __field0: _serde::__private::Option<
-                                DatabaseSettings<P>,
-                            > = _serde::__private::None;
-                            let mut __field1: _serde::__private::Option<
-                                ApplicationSettings<P>,
-                            > = _serde::__private::None;
-                            let mut __field2: _serde::__private::Option<
-                                EmailClientSettings<P>,
-                            > = _serde::__private::None;
-                            while let _serde::__private::Some(__key) = _serde::de::MapAccess::next_key::<
-                                __Field,
-                            >(&mut __map)? {
-                                match __key {
-                                    __Field::__field0 => {
-                                        if _serde::__private::Option::is_some(&__field0) {
-                                            return _serde::__private::Err(
-                                                <__A::Error as _serde::de::Error>::duplicate_field(
-                                                    "database",
-                                                ),
-                                            );
-                                        }
-                                        __field0 = _serde::__private::Some(
-                                            _serde::de::MapAccess::next_value::<
-                                                DatabaseSettings<P>,
-                                            >(&mut __map)?,
-                                        );
-                                    }
-                                    __Field::__field1 => {
-                                        if _serde::__private::Option::is_some(&__field1) {
-                                            return _serde::__private::Err(
-                                                <__A::Error as _serde::de::Error>::duplicate_field(
-                                                    "application",
-                                                ),
-                                            );
-                                        }
-                                        __field1 = _serde::__private::Some(
-                                            _serde::de::MapAccess::next_value::<
-                                                ApplicationSettings<P>,
-                                            >(&mut __map)?,
-                                        );
-                                    }
-                                    __Field::__field2 => {
-                                        if _serde::__private::Option::is_some(&__field2) {
-                                            return _serde::__private::Err(
-                                                <__A::Error as _serde::de::Error>::duplicate_field(
-                                                    "email_client",
-                                                ),
-                                            );
-                                        }
-                                        __field2 = _serde::__private::Some(
-                                            _serde::de::MapAccess::next_value::<
-                                                EmailClientSettings<P>,
-                                            >(&mut __map)?,
-                                        );
-                                    }
-                                    _ => {
-                                        let _ = _serde::de::MapAccess::next_value::<
-                                            _serde::de::IgnoredAny,
-                                        >(&mut __map)?;
-                                    }
-                                }
-                            }
-                            let __field0 = match __field0 {
-                                _serde::__private::Some(__field0) => __field0,
-                                _serde::__private::None => {
-                                    _serde::__private::de::missing_field("database")?
-                                }
-                            };
-                            let __field1 = match __field1 {
-                                _serde::__private::Some(__field1) => __field1,
-                                _serde::__private::None => {
-                                    _serde::__private::de::missing_field("application")?
-                                }
-                            };
-                            let __field2 = match __field2 {
-                                _serde::__private::Some(__field2) => __field2,
-                                _serde::__private::None => {
-                                    _serde::__private::de::missing_field("email_client")?
-                                }
-                            };
-                            _serde::__private::Ok(Settings {
-                                database: __field0,
-                                application: __field1,
-                                email_client: __field2,
-                            })
-                        }
-                    }
-                    #[doc(hidden)]
-                    const FIELDS: &'static [&'static str] = &[
-                        "database",
-                        "application",
-                        "email_client",
-                    ];
-                    _serde::Deserializer::deserialize_struct(
-                        __deserializer,
-                        "Settings",
-                        FIELDS,
-                        __Visitor {
-                            marker: _serde::__private::PhantomData::<Settings<P>>,
-                            lifetime: _serde::__private::PhantomData,
-                        },
-                    )
-                }
-            }
-        };
-        #[doc(hidden)]
-        #[allow(
-            non_upper_case_globals,
-            unused_attributes,
-            unused_qualifications,
-            clippy::absolute_paths,
-        )]
-        const _: () = {
-            #[allow(unused_extern_crates, clippy::useless_attribute)]
-            extern crate serde as _serde;
-            #[automatically_derived]
-            impl<'de, P: RefHKT> _serde::Deserialize<'de> for EmailClientSettings<P> {
-                fn deserialize<__D>(
-                    __deserializer: __D,
-                ) -> _serde::__private::Result<Self, __D::Error>
-                where
-                    __D: _serde::Deserializer<'de>,
-                {
-                    #[allow(non_camel_case_types)]
-                    #[doc(hidden)]
-                    enum __Field {
-                        __field0,
-                        __field1,
-                        __ignore,
-                    }
-                    #[doc(hidden)]
-                    struct __FieldVisitor;
-                    #[automatically_derived]
-                    impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
-                        type Value = __Field;
-                        fn expecting(
-                            &self,
-                            __formatter: &mut _serde::__private::Formatter,
-                        ) -> _serde::__private::fmt::Result {
-                            _serde::__private::Formatter::write_str(
-                                __formatter,
-                                "field identifier",
-                            )
-                        }
-                        fn visit_u64<__E>(
-                            self,
-                            __value: u64,
-                        ) -> _serde::__private::Result<Self::Value, __E>
-                        where
-                            __E: _serde::de::Error,
-                        {
-                            match __value {
-                                0u64 => _serde::__private::Ok(__Field::__field0),
-                                1u64 => _serde::__private::Ok(__Field::__field1),
-                                _ => _serde::__private::Ok(__Field::__ignore),
-                            }
-                        }
-                        fn visit_str<__E>(
-                            self,
-                            __value: &str,
-                        ) -> _serde::__private::Result<Self::Value, __E>
-                        where
-                            __E: _serde::de::Error,
-                        {
-                            match __value {
-                                "base_url" => _serde::__private::Ok(__Field::__field0),
-                                "sender_email" => _serde::__private::Ok(__Field::__field1),
-                                _ => _serde::__private::Ok(__Field::__ignore),
-                            }
-                        }
-                        fn visit_bytes<__E>(
-                            self,
-                            __value: &[u8],
-                        ) -> _serde::__private::Result<Self::Value, __E>
-                        where
-                            __E: _serde::de::Error,
-                        {
-                            match __value {
-                                b"base_url" => _serde::__private::Ok(__Field::__field0),
-                                b"sender_email" => _serde::__private::Ok(__Field::__field1),
-                                _ => _serde::__private::Ok(__Field::__ignore),
-                            }
-                        }
-                    }
-                    #[automatically_derived]
-                    impl<'de> _serde::Deserialize<'de> for __Field {
-                        #[inline]
-                        fn deserialize<__D>(
-                            __deserializer: __D,
-                        ) -> _serde::__private::Result<Self, __D::Error>
-                        where
-                            __D: _serde::Deserializer<'de>,
-                        {
-                            _serde::Deserializer::deserialize_identifier(
-                                __deserializer,
-                                __FieldVisitor,
-                            )
-                        }
-                    }
-                    #[doc(hidden)]
-                    struct __Visitor<'de, P: RefHKT> {
-                        marker: _serde::__private::PhantomData<EmailClientSettings<P>>,
-                        lifetime: _serde::__private::PhantomData<&'de ()>,
-                    }
-                    #[automatically_derived]
-                    impl<'de, P: RefHKT> _serde::de::Visitor<'de> for __Visitor<'de, P> {
-                        type Value = EmailClientSettings<P>;
-                        fn expecting(
-                            &self,
-                            __formatter: &mut _serde::__private::Formatter,
-                        ) -> _serde::__private::fmt::Result {
-                            _serde::__private::Formatter::write_str(
-                                __formatter,
-                                "struct EmailClientSettings",
-                            )
-                        }
-                        #[inline]
-                        fn visit_seq<__A>(
-                            self,
-                            mut __seq: __A,
-                        ) -> _serde::__private::Result<Self::Value, __A::Error>
-                        where
-                            __A: _serde::de::SeqAccess<'de>,
-                        {
-                            let __field0 = match _serde::de::SeqAccess::next_element::<
-                                K1<P, str>,
-                            >(&mut __seq)? {
-                                _serde::__private::Some(__value) => __value,
-                                _serde::__private::None => {
-                                    return _serde::__private::Err(
-                                        _serde::de::Error::invalid_length(
-                                            0usize,
-                                            &"struct EmailClientSettings with 2 elements",
-                                        ),
-                                    );
-                                }
-                            };
-                            let __field1 = match _serde::de::SeqAccess::next_element::<
-                                K1<P, str>,
-                            >(&mut __seq)? {
-                                _serde::__private::Some(__value) => __value,
-                                _serde::__private::None => {
-                                    return _serde::__private::Err(
-                                        _serde::de::Error::invalid_length(
-                                            1usize,
-                                            &"struct EmailClientSettings with 2 elements",
-                                        ),
-                                    );
-                                }
-                            };
-                            _serde::__private::Ok(EmailClientSettings {
-                                base_url: __field0,
-                                sender_email: __field1,
-                            })
-                        }
-                        #[inline]
-                        fn visit_map<__A>(
-                            self,
-                            mut __map: __A,
-                        ) -> _serde::__private::Result<Self::Value, __A::Error>
-                        where
-                            __A: _serde::de::MapAccess<'de>,
-                        {
-                            let mut __field0: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
-                            let mut __field1: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
-                            while let _serde::__private::Some(__key) = _serde::de::MapAccess::next_key::<
-                                __Field,
-                            >(&mut __map)? {
-                                match __key {
-                                    __Field::__field0 => {
-                                        if _serde::__private::Option::is_some(&__field0) {
-                                            return _serde::__private::Err(
-                                                <__A::Error as _serde::de::Error>::duplicate_field(
-                                                    "base_url",
-                                                ),
-                                            );
-                                        }
-                                        __field0 = _serde::__private::Some(
-                                            _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
-                                        );
-                                    }
-                                    __Field::__field1 => {
-                                        if _serde::__private::Option::is_some(&__field1) {
-                                            return _serde::__private::Err(
-                                                <__A::Error as _serde::de::Error>::duplicate_field(
-                                                    "sender_email",
-                                                ),
-                                            );
-                                        }
-                                        __field1 = _serde::__private::Some(
-                                            _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
-                                        );
-                                    }
-                                    _ => {
-                                        let _ = _serde::de::MapAccess::next_value::<
-                                            _serde::de::IgnoredAny,
-                                        >(&mut __map)?;
-                                    }
-                                }
-                            }
-                            let __field0 = match __field0 {
-                                _serde::__private::Some(__field0) => __field0,
-                                _serde::__private::None => {
-                                    _serde::__private::de::missing_field("base_url")?
-                                }
-                            };
-                            let __field1 = match __field1 {
-                                _serde::__private::Some(__field1) => __field1,
-                                _serde::__private::None => {
-                                    _serde::__private::de::missing_field("sender_email")?
-                                }
-                            };
-                            _serde::__private::Ok(EmailClientSettings {
-                                base_url: __field0,
-                                sender_email: __field1,
-                            })
-                        }
-                    }
-                    #[doc(hidden)]
-                    const FIELDS: &'static [&'static str] = &[
-                        "base_url",
-                        "sender_email",
-                    ];
-                    _serde::Deserializer::deserialize_struct(
-                        __deserializer,
-                        "EmailClientSettings",
-                        FIELDS,
-                        __Visitor {
-                            marker: _serde::__private::PhantomData::<
-                                EmailClientSettings<P>,
-                            >,
-                            lifetime: _serde::__private::PhantomData,
-                        },
-                    )
-                }
-            }
-        };
-    }
-    const APP_ENVIRONMENT: &str = {
-        let _ = || {
-            let _ = &APP_ENVIRONMENT;
-        };
-        "APP_ENVIRONMENT"
-    };
-    pub struct Settings<P: RefHKT> {
-        pub database: DatabaseSettings<P>,
-        pub application: ApplicationSettings<P>,
-        pub email_client: EmailClientSettings<P>,
-    }
-    #[allow(missing_docs)]
-    #[allow(unreachable_code)]
+    use std::{fmt::Debug, ops::Deref, rc::Rc, sync::Arc};
+    use crate::hkt;
+    pub enum ArcHKT {}
     #[automatically_derived]
-    impl<P: RefHKT> Settings<P> {
+    impl ::core::fmt::Debug for ArcHKT {
         #[inline]
-        pub const fn new(
-            database: DatabaseSettings<P>,
-            application: ApplicationSettings<P>,
-            email_client: EmailClientSettings<P>,
-        ) -> Settings<P> {
-            Settings {
-                database: database,
-                application: application,
-                email_client: email_client,
-            }
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            match *self {}
         }
     }
-    pub struct DatabaseSettings<P: RefHKT> {
-        pub username: K1<P, str>,
-        pub password: K1<P, str>,
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        pub port: u16,
-        pub host: K1<P, str>,
-        pub database_name: K1<P, str>,
-        pub require_ssl: bool,
+    #[automatically_derived]
+    impl ::core::clone::Clone for ArcHKT {
+        #[inline]
+        fn clone(&self) -> ArcHKT {
+            match *self {}
+        }
     }
-    #[allow(missing_docs)]
+    #[automatically_derived]
+    impl ::core::hash::Hash for ArcHKT {
+        #[inline]
+        fn hash<__H: ::core::hash::Hasher>(&self, state: &mut __H) -> () {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::marker::StructuralPartialEq for ArcHKT {}
+    #[automatically_derived]
+    impl ::core::cmp::PartialEq for ArcHKT {
+        #[inline]
+        fn eq(&self, other: &ArcHKT) -> bool {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::cmp::Eq for ArcHKT {
+        #[inline]
+        #[doc(hidden)]
+        #[coverage(off)]
+        fn assert_receiver_is_total_eq(&self) -> () {}
+    }
+    #[automatically_derived]
+    impl ::core::cmp::PartialOrd for ArcHKT {
+        #[inline]
+        fn partial_cmp(
+            &self,
+            other: &ArcHKT,
+        ) -> ::core::option::Option<::core::cmp::Ordering> {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::cmp::Ord for ArcHKT {
+        #[inline]
+        fn cmp(&self, other: &ArcHKT) -> ::core::cmp::Ordering {
+            match *self {}
+        }
+    }
     #[allow(unreachable_code)]
     #[automatically_derived]
-    impl<P: RefHKT> DatabaseSettings<P> {
-        #[inline]
-        pub const fn new(
-            username: K1<P, str>,
-            password: K1<P, str>,
-            port: u16,
-            host: K1<P, str>,
-            database_name: K1<P, str>,
-            require_ssl: bool,
-        ) -> DatabaseSettings<P> {
-            DatabaseSettings {
-                username: username,
-                password: password,
-                port: port,
-                host: host,
-                database_name: database_name,
-                require_ssl: require_ssl,
-            }
+    impl derive_more::core::fmt::Display for ArcHKT {
+        fn fmt(
+            &self,
+            __derive_more_f: &mut derive_more::core::fmt::Formatter<'_>,
+        ) -> derive_more::core::fmt::Result {
+            match *self {}
         }
     }
     #[doc(hidden)]
@@ -606,10 +80,30 @@ pub mod configuration {
         #[allow(unused_extern_crates, clippy::useless_attribute)]
         extern crate serde as _serde;
         #[automatically_derived]
-        impl<'de, P: RefHKT> _serde::Deserialize<'de> for DatabaseSettings<P>
-        where
-            P: _serde::Deserialize<'de>,
-        {
+        impl _serde::Serialize for ArcHKT {
+            fn serialize<__S>(
+                &self,
+                __serializer: __S,
+            ) -> _serde::__private::Result<__S::Ok, __S::Error>
+            where
+                __S: _serde::Serializer,
+            {
+                match *self {}
+            }
+        }
+    };
+    #[doc(hidden)]
+    #[allow(
+        non_upper_case_globals,
+        unused_attributes,
+        unused_qualifications,
+        clippy::absolute_paths,
+    )]
+    const _: () = {
+        #[allow(unused_extern_crates, clippy::useless_attribute)]
+        extern crate serde as _serde;
+        #[automatically_derived]
+        impl<'de> _serde::Deserialize<'de> for ArcHKT {
             fn deserialize<__D>(
                 __deserializer: __D,
             ) -> _serde::__private::Result<Self, __D::Error>
@@ -618,15 +112,7 @@ pub mod configuration {
             {
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
-                enum __Field {
-                    __field0,
-                    __field1,
-                    __field2,
-                    __field3,
-                    __field4,
-                    __field5,
-                    __ignore,
-                }
+                enum __Field {}
                 #[doc(hidden)]
                 struct __FieldVisitor;
                 #[automatically_derived]
@@ -638,7 +124,7 @@ pub mod configuration {
                     ) -> _serde::__private::fmt::Result {
                         _serde::__private::Formatter::write_str(
                             __formatter,
-                            "field identifier",
+                            "variant identifier",
                         )
                     }
                     fn visit_u64<__E>(
@@ -649,13 +135,14 @@ pub mod configuration {
                         __E: _serde::de::Error,
                     {
                         match __value {
-                            0u64 => _serde::__private::Ok(__Field::__field0),
-                            1u64 => _serde::__private::Ok(__Field::__field1),
-                            2u64 => _serde::__private::Ok(__Field::__field2),
-                            3u64 => _serde::__private::Ok(__Field::__field3),
-                            4u64 => _serde::__private::Ok(__Field::__field4),
-                            5u64 => _serde::__private::Ok(__Field::__field5),
-                            _ => _serde::__private::Ok(__Field::__ignore),
+                            _ => {
+                                _serde::__private::Err(
+                                    _serde::de::Error::invalid_value(
+                                        _serde::de::Unexpected::Unsigned(__value),
+                                        &"variant index 0 <= i < 0",
+                                    ),
+                                )
+                            }
                         }
                     }
                     fn visit_str<__E>(
@@ -666,13 +153,11 @@ pub mod configuration {
                         __E: _serde::de::Error,
                     {
                         match __value {
-                            "username" => _serde::__private::Ok(__Field::__field0),
-                            "password" => _serde::__private::Ok(__Field::__field1),
-                            "port" => _serde::__private::Ok(__Field::__field2),
-                            "host" => _serde::__private::Ok(__Field::__field3),
-                            "database_name" => _serde::__private::Ok(__Field::__field4),
-                            "require_ssl" => _serde::__private::Ok(__Field::__field5),
-                            _ => _serde::__private::Ok(__Field::__ignore),
+                            _ => {
+                                _serde::__private::Err(
+                                    _serde::de::Error::unknown_variant(__value, VARIANTS),
+                                )
+                            }
                         }
                     }
                     fn visit_bytes<__E>(
@@ -683,13 +168,12 @@ pub mod configuration {
                         __E: _serde::de::Error,
                     {
                         match __value {
-                            b"username" => _serde::__private::Ok(__Field::__field0),
-                            b"password" => _serde::__private::Ok(__Field::__field1),
-                            b"port" => _serde::__private::Ok(__Field::__field2),
-                            b"host" => _serde::__private::Ok(__Field::__field3),
-                            b"database_name" => _serde::__private::Ok(__Field::__field4),
-                            b"require_ssl" => _serde::__private::Ok(__Field::__field5),
-                            _ => _serde::__private::Ok(__Field::__ignore),
+                            _ => {
+                                let __value = &_serde::__private::from_utf8_lossy(__value);
+                                _serde::__private::Err(
+                                    _serde::de::Error::unknown_variant(__value, VARIANTS),
+                                )
+                            }
                         }
                     }
                 }
@@ -709,372 +193,112 @@ pub mod configuration {
                     }
                 }
                 #[doc(hidden)]
-                struct __Visitor<'de, P: RefHKT>
-                where
-                    P: _serde::Deserialize<'de>,
-                {
-                    marker: _serde::__private::PhantomData<DatabaseSettings<P>>,
+                struct __Visitor<'de> {
+                    marker: _serde::__private::PhantomData<ArcHKT>,
                     lifetime: _serde::__private::PhantomData<&'de ()>,
                 }
                 #[automatically_derived]
-                impl<'de, P: RefHKT> _serde::de::Visitor<'de> for __Visitor<'de, P>
-                where
-                    P: _serde::Deserialize<'de>,
-                {
-                    type Value = DatabaseSettings<P>;
+                impl<'de> _serde::de::Visitor<'de> for __Visitor<'de> {
+                    type Value = ArcHKT;
                     fn expecting(
                         &self,
                         __formatter: &mut _serde::__private::Formatter,
                     ) -> _serde::__private::fmt::Result {
                         _serde::__private::Formatter::write_str(
                             __formatter,
-                            "struct DatabaseSettings",
+                            "enum ArcHKT",
                         )
                     }
-                    #[inline]
-                    fn visit_seq<__A>(
+                    fn visit_enum<__A>(
                         self,
-                        mut __seq: __A,
+                        __data: __A,
                     ) -> _serde::__private::Result<Self::Value, __A::Error>
                     where
-                        __A: _serde::de::SeqAccess<'de>,
+                        __A: _serde::de::EnumAccess<'de>,
                     {
-                        let __field0 = match _serde::de::SeqAccess::next_element::<
-                            K1<P, str>,
-                        >(&mut __seq)? {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        0usize,
-                                        &"struct DatabaseSettings with 6 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        let __field1 = match _serde::de::SeqAccess::next_element::<
-                            K1<P, str>,
-                        >(&mut __seq)? {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        1usize,
-                                        &"struct DatabaseSettings with 6 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        let __field2 = match {
-                            #[doc(hidden)]
-                            struct __DeserializeWith<'de, P: RefHKT>
-                            where
-                                P: _serde::Deserialize<'de>,
-                            {
-                                value: u16,
-                                phantom: _serde::__private::PhantomData<
-                                    DatabaseSettings<P>,
-                                >,
-                                lifetime: _serde::__private::PhantomData<&'de ()>,
-                            }
-                            #[automatically_derived]
-                            impl<'de, P: RefHKT> _serde::Deserialize<'de>
-                            for __DeserializeWith<'de, P>
-                            where
-                                P: _serde::Deserialize<'de>,
-                            {
-                                fn deserialize<__D>(
-                                    __deserializer: __D,
-                                ) -> _serde::__private::Result<Self, __D::Error>
-                                where
-                                    __D: _serde::Deserializer<'de>,
-                                {
-                                    _serde::__private::Ok(__DeserializeWith {
-                                        value: deserialize_number_from_string(__deserializer)?,
-                                        phantom: _serde::__private::PhantomData,
-                                        lifetime: _serde::__private::PhantomData,
-                                    })
-                                }
-                            }
-                            _serde::__private::Option::map(
-                                _serde::de::SeqAccess::next_element::<
-                                    __DeserializeWith<'de, P>,
-                                >(&mut __seq)?,
-                                |__wrap| __wrap.value,
-                            )
-                        } {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        2usize,
-                                        &"struct DatabaseSettings with 6 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        let __field3 = match _serde::de::SeqAccess::next_element::<
-                            K1<P, str>,
-                        >(&mut __seq)? {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        3usize,
-                                        &"struct DatabaseSettings with 6 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        let __field4 = match _serde::de::SeqAccess::next_element::<
-                            K1<P, str>,
-                        >(&mut __seq)? {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        4usize,
-                                        &"struct DatabaseSettings with 6 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        let __field5 = match _serde::de::SeqAccess::next_element::<
-                            bool,
-                        >(&mut __seq)? {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        5usize,
-                                        &"struct DatabaseSettings with 6 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        _serde::__private::Ok(DatabaseSettings {
-                            username: __field0,
-                            password: __field1,
-                            port: __field2,
-                            host: __field3,
-                            database_name: __field4,
-                            require_ssl: __field5,
-                        })
-                    }
-                    #[inline]
-                    fn visit_map<__A>(
-                        self,
-                        mut __map: __A,
-                    ) -> _serde::__private::Result<Self::Value, __A::Error>
-                    where
-                        __A: _serde::de::MapAccess<'de>,
-                    {
-                        let mut __field0: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
-                        let mut __field1: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
-                        let mut __field2: _serde::__private::Option<u16> = _serde::__private::None;
-                        let mut __field3: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
-                        let mut __field4: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
-                        let mut __field5: _serde::__private::Option<bool> = _serde::__private::None;
-                        while let _serde::__private::Some(__key) = _serde::de::MapAccess::next_key::<
-                            __Field,
-                        >(&mut __map)? {
-                            match __key {
-                                __Field::__field0 => {
-                                    if _serde::__private::Option::is_some(&__field0) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field(
-                                                "username",
-                                            ),
-                                        );
-                                    }
-                                    __field0 = _serde::__private::Some(
-                                        _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
-                                    );
-                                }
-                                __Field::__field1 => {
-                                    if _serde::__private::Option::is_some(&__field1) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field(
-                                                "password",
-                                            ),
-                                        );
-                                    }
-                                    __field1 = _serde::__private::Some(
-                                        _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
-                                    );
-                                }
-                                __Field::__field2 => {
-                                    if _serde::__private::Option::is_some(&__field2) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field("port"),
-                                        );
-                                    }
-                                    __field2 = _serde::__private::Some({
-                                        #[doc(hidden)]
-                                        struct __DeserializeWith<'de, P: RefHKT>
-                                        where
-                                            P: _serde::Deserialize<'de>,
-                                        {
-                                            value: u16,
-                                            phantom: _serde::__private::PhantomData<
-                                                DatabaseSettings<P>,
-                                            >,
-                                            lifetime: _serde::__private::PhantomData<&'de ()>,
-                                        }
-                                        #[automatically_derived]
-                                        impl<'de, P: RefHKT> _serde::Deserialize<'de>
-                                        for __DeserializeWith<'de, P>
-                                        where
-                                            P: _serde::Deserialize<'de>,
-                                        {
-                                            fn deserialize<__D>(
-                                                __deserializer: __D,
-                                            ) -> _serde::__private::Result<Self, __D::Error>
-                                            where
-                                                __D: _serde::Deserializer<'de>,
-                                            {
-                                                _serde::__private::Ok(__DeserializeWith {
-                                                    value: deserialize_number_from_string(__deserializer)?,
-                                                    phantom: _serde::__private::PhantomData,
-                                                    lifetime: _serde::__private::PhantomData,
-                                                })
-                                            }
-                                        }
-                                        match _serde::de::MapAccess::next_value::<
-                                            __DeserializeWith<'de, P>,
-                                        >(&mut __map) {
-                                            _serde::__private::Ok(__wrapper) => __wrapper.value,
-                                            _serde::__private::Err(__err) => {
-                                                return _serde::__private::Err(__err);
-                                            }
-                                        }
-                                    });
-                                }
-                                __Field::__field3 => {
-                                    if _serde::__private::Option::is_some(&__field3) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field("host"),
-                                        );
-                                    }
-                                    __field3 = _serde::__private::Some(
-                                        _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
-                                    );
-                                }
-                                __Field::__field4 => {
-                                    if _serde::__private::Option::is_some(&__field4) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field(
-                                                "database_name",
-                                            ),
-                                        );
-                                    }
-                                    __field4 = _serde::__private::Some(
-                                        _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
-                                    );
-                                }
-                                __Field::__field5 => {
-                                    if _serde::__private::Option::is_some(&__field5) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field(
-                                                "require_ssl",
-                                            ),
-                                        );
-                                    }
-                                    __field5 = _serde::__private::Some(
-                                        _serde::de::MapAccess::next_value::<bool>(&mut __map)?,
-                                    );
-                                }
-                                _ => {
-                                    let _ = _serde::de::MapAccess::next_value::<
-                                        _serde::de::IgnoredAny,
-                                    >(&mut __map)?;
-                                }
-                            }
-                        }
-                        let __field0 = match __field0 {
-                            _serde::__private::Some(__field0) => __field0,
-                            _serde::__private::None => {
-                                _serde::__private::de::missing_field("username")?
-                            }
-                        };
-                        let __field1 = match __field1 {
-                            _serde::__private::Some(__field1) => __field1,
-                            _serde::__private::None => {
-                                _serde::__private::de::missing_field("password")?
-                            }
-                        };
-                        let __field2 = match __field2 {
-                            _serde::__private::Some(__field2) => __field2,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    <__A::Error as _serde::de::Error>::missing_field("port"),
-                                );
-                            }
-                        };
-                        let __field3 = match __field3 {
-                            _serde::__private::Some(__field3) => __field3,
-                            _serde::__private::None => {
-                                _serde::__private::de::missing_field("host")?
-                            }
-                        };
-                        let __field4 = match __field4 {
-                            _serde::__private::Some(__field4) => __field4,
-                            _serde::__private::None => {
-                                _serde::__private::de::missing_field("database_name")?
-                            }
-                        };
-                        let __field5 = match __field5 {
-                            _serde::__private::Some(__field5) => __field5,
-                            _serde::__private::None => {
-                                _serde::__private::de::missing_field("require_ssl")?
-                            }
-                        };
-                        _serde::__private::Ok(DatabaseSettings {
-                            username: __field0,
-                            password: __field1,
-                            port: __field2,
-                            host: __field3,
-                            database_name: __field4,
-                            require_ssl: __field5,
-                        })
+                        _serde::__private::Result::map(
+                            _serde::de::EnumAccess::variant::<__Field>(__data),
+                            |(__impossible, _)| match __impossible {},
+                        )
                     }
                 }
                 #[doc(hidden)]
-                const FIELDS: &'static [&'static str] = &[
-                    "username",
-                    "password",
-                    "port",
-                    "host",
-                    "database_name",
-                    "require_ssl",
-                ];
-                _serde::Deserializer::deserialize_struct(
+                const VARIANTS: &'static [&'static str] = &[];
+                _serde::Deserializer::deserialize_enum(
                     __deserializer,
-                    "DatabaseSettings",
-                    FIELDS,
+                    "ArcHKT",
+                    VARIANTS,
                     __Visitor {
-                        marker: _serde::__private::PhantomData::<DatabaseSettings<P>>,
+                        marker: _serde::__private::PhantomData::<ArcHKT>,
                         lifetime: _serde::__private::PhantomData,
                     },
                 )
             }
         }
     };
-    pub struct ApplicationSettings<P: RefHKT> {
-        #[serde(deserialize_with = "deserialize_number_from_string")]
-        pub port: u16,
-        pub host: K1<P, str>,
+    pub enum RcHKT {}
+    #[automatically_derived]
+    impl ::core::fmt::Debug for RcHKT {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            match *self {}
+        }
     }
-    #[allow(missing_docs)]
+    #[automatically_derived]
+    impl ::core::clone::Clone for RcHKT {
+        #[inline]
+        fn clone(&self) -> RcHKT {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::hash::Hash for RcHKT {
+        #[inline]
+        fn hash<__H: ::core::hash::Hasher>(&self, state: &mut __H) -> () {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::marker::StructuralPartialEq for RcHKT {}
+    #[automatically_derived]
+    impl ::core::cmp::PartialEq for RcHKT {
+        #[inline]
+        fn eq(&self, other: &RcHKT) -> bool {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::cmp::Eq for RcHKT {
+        #[inline]
+        #[doc(hidden)]
+        #[coverage(off)]
+        fn assert_receiver_is_total_eq(&self) -> () {}
+    }
+    #[automatically_derived]
+    impl ::core::cmp::PartialOrd for RcHKT {
+        #[inline]
+        fn partial_cmp(
+            &self,
+            other: &RcHKT,
+        ) -> ::core::option::Option<::core::cmp::Ordering> {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::cmp::Ord for RcHKT {
+        #[inline]
+        fn cmp(&self, other: &RcHKT) -> ::core::cmp::Ordering {
+            match *self {}
+        }
+    }
     #[allow(unreachable_code)]
     #[automatically_derived]
-    impl<P: RefHKT> ApplicationSettings<P> {
-        #[inline]
-        pub const fn new(port: u16, host: K1<P, str>) -> ApplicationSettings<P> {
-            ApplicationSettings {
-                port: port,
-                host: host,
-            }
+    impl derive_more::core::fmt::Display for RcHKT {
+        fn fmt(
+            &self,
+            __derive_more_f: &mut derive_more::core::fmt::Formatter<'_>,
+        ) -> derive_more::core::fmt::Result {
+            match *self {}
         }
     }
     #[doc(hidden)]
@@ -1088,10 +312,30 @@ pub mod configuration {
         #[allow(unused_extern_crates, clippy::useless_attribute)]
         extern crate serde as _serde;
         #[automatically_derived]
-        impl<'de, P: RefHKT> _serde::Deserialize<'de> for ApplicationSettings<P>
-        where
-            P: _serde::Deserialize<'de>,
-        {
+        impl _serde::Serialize for RcHKT {
+            fn serialize<__S>(
+                &self,
+                __serializer: __S,
+            ) -> _serde::__private::Result<__S::Ok, __S::Error>
+            where
+                __S: _serde::Serializer,
+            {
+                match *self {}
+            }
+        }
+    };
+    #[doc(hidden)]
+    #[allow(
+        non_upper_case_globals,
+        unused_attributes,
+        unused_qualifications,
+        clippy::absolute_paths,
+    )]
+    const _: () = {
+        #[allow(unused_extern_crates, clippy::useless_attribute)]
+        extern crate serde as _serde;
+        #[automatically_derived]
+        impl<'de> _serde::Deserialize<'de> for RcHKT {
             fn deserialize<__D>(
                 __deserializer: __D,
             ) -> _serde::__private::Result<Self, __D::Error>
@@ -1100,11 +344,7 @@ pub mod configuration {
             {
                 #[allow(non_camel_case_types)]
                 #[doc(hidden)]
-                enum __Field {
-                    __field0,
-                    __field1,
-                    __ignore,
-                }
+                enum __Field {}
                 #[doc(hidden)]
                 struct __FieldVisitor;
                 #[automatically_derived]
@@ -1116,7 +356,7 @@ pub mod configuration {
                     ) -> _serde::__private::fmt::Result {
                         _serde::__private::Formatter::write_str(
                             __formatter,
-                            "field identifier",
+                            "variant identifier",
                         )
                     }
                     fn visit_u64<__E>(
@@ -1127,9 +367,14 @@ pub mod configuration {
                         __E: _serde::de::Error,
                     {
                         match __value {
-                            0u64 => _serde::__private::Ok(__Field::__field0),
-                            1u64 => _serde::__private::Ok(__Field::__field1),
-                            _ => _serde::__private::Ok(__Field::__ignore),
+                            _ => {
+                                _serde::__private::Err(
+                                    _serde::de::Error::invalid_value(
+                                        _serde::de::Unexpected::Unsigned(__value),
+                                        &"variant index 0 <= i < 0",
+                                    ),
+                                )
+                            }
                         }
                     }
                     fn visit_str<__E>(
@@ -1140,9 +385,11 @@ pub mod configuration {
                         __E: _serde::de::Error,
                     {
                         match __value {
-                            "port" => _serde::__private::Ok(__Field::__field0),
-                            "host" => _serde::__private::Ok(__Field::__field1),
-                            _ => _serde::__private::Ok(__Field::__ignore),
+                            _ => {
+                                _serde::__private::Err(
+                                    _serde::de::Error::unknown_variant(__value, VARIANTS),
+                                )
+                            }
                         }
                     }
                     fn visit_bytes<__E>(
@@ -1153,9 +400,12 @@ pub mod configuration {
                         __E: _serde::de::Error,
                     {
                         match __value {
-                            b"port" => _serde::__private::Ok(__Field::__field0),
-                            b"host" => _serde::__private::Ok(__Field::__field1),
-                            _ => _serde::__private::Ok(__Field::__ignore),
+                            _ => {
+                                let __value = &_serde::__private::from_utf8_lossy(__value);
+                                _serde::__private::Err(
+                                    _serde::de::Error::unknown_variant(__value, VARIANTS),
+                                )
+                            }
                         }
                     }
                 }
@@ -1175,327 +425,522 @@ pub mod configuration {
                     }
                 }
                 #[doc(hidden)]
-                struct __Visitor<'de, P: RefHKT>
-                where
-                    P: _serde::Deserialize<'de>,
-                {
-                    marker: _serde::__private::PhantomData<ApplicationSettings<P>>,
+                struct __Visitor<'de> {
+                    marker: _serde::__private::PhantomData<RcHKT>,
                     lifetime: _serde::__private::PhantomData<&'de ()>,
                 }
                 #[automatically_derived]
-                impl<'de, P: RefHKT> _serde::de::Visitor<'de> for __Visitor<'de, P>
-                where
-                    P: _serde::Deserialize<'de>,
-                {
-                    type Value = ApplicationSettings<P>;
+                impl<'de> _serde::de::Visitor<'de> for __Visitor<'de> {
+                    type Value = RcHKT;
                     fn expecting(
                         &self,
                         __formatter: &mut _serde::__private::Formatter,
                     ) -> _serde::__private::fmt::Result {
                         _serde::__private::Formatter::write_str(
                             __formatter,
-                            "struct ApplicationSettings",
+                            "enum RcHKT",
                         )
                     }
-                    #[inline]
-                    fn visit_seq<__A>(
+                    fn visit_enum<__A>(
                         self,
-                        mut __seq: __A,
+                        __data: __A,
                     ) -> _serde::__private::Result<Self::Value, __A::Error>
                     where
-                        __A: _serde::de::SeqAccess<'de>,
+                        __A: _serde::de::EnumAccess<'de>,
                     {
-                        let __field0 = match {
-                            #[doc(hidden)]
-                            struct __DeserializeWith<'de, P: RefHKT>
-                            where
-                                P: _serde::Deserialize<'de>,
-                            {
-                                value: u16,
-                                phantom: _serde::__private::PhantomData<
-                                    ApplicationSettings<P>,
-                                >,
-                                lifetime: _serde::__private::PhantomData<&'de ()>,
-                            }
-                            #[automatically_derived]
-                            impl<'de, P: RefHKT> _serde::Deserialize<'de>
-                            for __DeserializeWith<'de, P>
-                            where
-                                P: _serde::Deserialize<'de>,
-                            {
-                                fn deserialize<__D>(
-                                    __deserializer: __D,
-                                ) -> _serde::__private::Result<Self, __D::Error>
-                                where
-                                    __D: _serde::Deserializer<'de>,
-                                {
-                                    _serde::__private::Ok(__DeserializeWith {
-                                        value: deserialize_number_from_string(__deserializer)?,
-                                        phantom: _serde::__private::PhantomData,
-                                        lifetime: _serde::__private::PhantomData,
-                                    })
-                                }
-                            }
-                            _serde::__private::Option::map(
-                                _serde::de::SeqAccess::next_element::<
-                                    __DeserializeWith<'de, P>,
-                                >(&mut __seq)?,
-                                |__wrap| __wrap.value,
-                            )
-                        } {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        0usize,
-                                        &"struct ApplicationSettings with 2 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        let __field1 = match _serde::de::SeqAccess::next_element::<
-                            K1<P, str>,
-                        >(&mut __seq)? {
-                            _serde::__private::Some(__value) => __value,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    _serde::de::Error::invalid_length(
-                                        1usize,
-                                        &"struct ApplicationSettings with 2 elements",
-                                    ),
-                                );
-                            }
-                        };
-                        _serde::__private::Ok(ApplicationSettings {
-                            port: __field0,
-                            host: __field1,
-                        })
-                    }
-                    #[inline]
-                    fn visit_map<__A>(
-                        self,
-                        mut __map: __A,
-                    ) -> _serde::__private::Result<Self::Value, __A::Error>
-                    where
-                        __A: _serde::de::MapAccess<'de>,
-                    {
-                        let mut __field0: _serde::__private::Option<u16> = _serde::__private::None;
-                        let mut __field1: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
-                        while let _serde::__private::Some(__key) = _serde::de::MapAccess::next_key::<
-                            __Field,
-                        >(&mut __map)? {
-                            match __key {
-                                __Field::__field0 => {
-                                    if _serde::__private::Option::is_some(&__field0) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field("port"),
-                                        );
-                                    }
-                                    __field0 = _serde::__private::Some({
-                                        #[doc(hidden)]
-                                        struct __DeserializeWith<'de, P: RefHKT>
-                                        where
-                                            P: _serde::Deserialize<'de>,
-                                        {
-                                            value: u16,
-                                            phantom: _serde::__private::PhantomData<
-                                                ApplicationSettings<P>,
-                                            >,
-                                            lifetime: _serde::__private::PhantomData<&'de ()>,
-                                        }
-                                        #[automatically_derived]
-                                        impl<'de, P: RefHKT> _serde::Deserialize<'de>
-                                        for __DeserializeWith<'de, P>
-                                        where
-                                            P: _serde::Deserialize<'de>,
-                                        {
-                                            fn deserialize<__D>(
-                                                __deserializer: __D,
-                                            ) -> _serde::__private::Result<Self, __D::Error>
-                                            where
-                                                __D: _serde::Deserializer<'de>,
-                                            {
-                                                _serde::__private::Ok(__DeserializeWith {
-                                                    value: deserialize_number_from_string(__deserializer)?,
-                                                    phantom: _serde::__private::PhantomData,
-                                                    lifetime: _serde::__private::PhantomData,
-                                                })
-                                            }
-                                        }
-                                        match _serde::de::MapAccess::next_value::<
-                                            __DeserializeWith<'de, P>,
-                                        >(&mut __map) {
-                                            _serde::__private::Ok(__wrapper) => __wrapper.value,
-                                            _serde::__private::Err(__err) => {
-                                                return _serde::__private::Err(__err);
-                                            }
-                                        }
-                                    });
-                                }
-                                __Field::__field1 => {
-                                    if _serde::__private::Option::is_some(&__field1) {
-                                        return _serde::__private::Err(
-                                            <__A::Error as _serde::de::Error>::duplicate_field("host"),
-                                        );
-                                    }
-                                    __field1 = _serde::__private::Some(
-                                        _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
-                                    );
-                                }
-                                _ => {
-                                    let _ = _serde::de::MapAccess::next_value::<
-                                        _serde::de::IgnoredAny,
-                                    >(&mut __map)?;
-                                }
-                            }
-                        }
-                        let __field0 = match __field0 {
-                            _serde::__private::Some(__field0) => __field0,
-                            _serde::__private::None => {
-                                return _serde::__private::Err(
-                                    <__A::Error as _serde::de::Error>::missing_field("port"),
-                                );
-                            }
-                        };
-                        let __field1 = match __field1 {
-                            _serde::__private::Some(__field1) => __field1,
-                            _serde::__private::None => {
-                                _serde::__private::de::missing_field("host")?
-                            }
-                        };
-                        _serde::__private::Ok(ApplicationSettings {
-                            port: __field0,
-                            host: __field1,
-                        })
+                        _serde::__private::Result::map(
+                            _serde::de::EnumAccess::variant::<__Field>(__data),
+                            |(__impossible, _)| match __impossible {},
+                        )
                     }
                 }
                 #[doc(hidden)]
-                const FIELDS: &'static [&'static str] = &["port", "host"];
-                _serde::Deserializer::deserialize_struct(
+                const VARIANTS: &'static [&'static str] = &[];
+                _serde::Deserializer::deserialize_enum(
                     __deserializer,
-                    "ApplicationSettings",
-                    FIELDS,
+                    "RcHKT",
+                    VARIANTS,
                     __Visitor {
-                        marker: _serde::__private::PhantomData::<ApplicationSettings<P>>,
+                        marker: _serde::__private::PhantomData::<RcHKT>,
                         lifetime: _serde::__private::PhantomData,
                     },
                 )
             }
         }
     };
-    pub struct EmailClientSettings<P: RefHKT> {
-        pub base_url: K1<P, str>,
-        pub sender_email: K1<P, str>,
+    pub enum BoxHKT {}
+    #[automatically_derived]
+    impl ::core::fmt::Debug for BoxHKT {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            match *self {}
+        }
     }
-    #[allow(missing_docs)]
+    #[automatically_derived]
+    impl ::core::clone::Clone for BoxHKT {
+        #[inline]
+        fn clone(&self) -> BoxHKT {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::hash::Hash for BoxHKT {
+        #[inline]
+        fn hash<__H: ::core::hash::Hasher>(&self, state: &mut __H) -> () {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::marker::StructuralPartialEq for BoxHKT {}
+    #[automatically_derived]
+    impl ::core::cmp::PartialEq for BoxHKT {
+        #[inline]
+        fn eq(&self, other: &BoxHKT) -> bool {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::cmp::Eq for BoxHKT {
+        #[inline]
+        #[doc(hidden)]
+        #[coverage(off)]
+        fn assert_receiver_is_total_eq(&self) -> () {}
+    }
+    #[automatically_derived]
+    impl ::core::cmp::PartialOrd for BoxHKT {
+        #[inline]
+        fn partial_cmp(
+            &self,
+            other: &BoxHKT,
+        ) -> ::core::option::Option<::core::cmp::Ordering> {
+            match *self {}
+        }
+    }
+    #[automatically_derived]
+    impl ::core::cmp::Ord for BoxHKT {
+        #[inline]
+        fn cmp(&self, other: &BoxHKT) -> ::core::cmp::Ordering {
+            match *self {}
+        }
+    }
     #[allow(unreachable_code)]
     #[automatically_derived]
-    impl<P: RefHKT> EmailClientSettings<P> {
-        #[inline]
-        pub const fn new(
-            base_url: K1<P, str>,
-            sender_email: K1<P, str>,
-        ) -> EmailClientSettings<P> {
-            EmailClientSettings {
-                base_url: base_url,
-                sender_email: sender_email,
+    impl derive_more::core::fmt::Display for BoxHKT {
+        fn fmt(
+            &self,
+            __derive_more_f: &mut derive_more::core::fmt::Formatter<'_>,
+        ) -> derive_more::core::fmt::Result {
+            match *self {}
+        }
+    }
+    #[doc(hidden)]
+    #[allow(
+        non_upper_case_globals,
+        unused_attributes,
+        unused_qualifications,
+        clippy::absolute_paths,
+    )]
+    const _: () = {
+        #[allow(unused_extern_crates, clippy::useless_attribute)]
+        extern crate serde as _serde;
+        #[automatically_derived]
+        impl _serde::Serialize for BoxHKT {
+            fn serialize<__S>(
+                &self,
+                __serializer: __S,
+            ) -> _serde::__private::Result<__S::Ok, __S::Error>
+            where
+                __S: _serde::Serializer,
+            {
+                match *self {}
             }
         }
-    }
-    impl<P: SharedPointerHKT> EmailClientSettings<P> {
-        pub fn sender(&self) -> Result<SubscriberEmail<P>, SubscriberEmailParseError> {
-            SubscriberEmail::try_from(self.sender_email.clone())
-        }
-    }
-    pub enum Environment {
-        Local,
-        Production,
-    }
-    impl Environment {
-        pub fn as_str(&self) -> &'static str {
-            match self {
-                Environment::Local => "local",
-                Environment::Production => "production",
-            }
-        }
-    }
-    impl TryFrom<String> for Environment {
-        type Error = String;
-        fn try_from(s: String) -> Result<Self, Self::Error> {
-            match s.to_lowercase().as_str() {
-                "local" => Ok(Self::Local),
-                "production" => Ok(Self::Production),
-                other => {
-                    Err(
-                        ::alloc::__export::must_use({
-                            let res = ::alloc::fmt::format(
-                                format_args!(
-                                    "{0} is not a supported environment. Use either `local` or `production`.",
-                                    other,
-                                ),
-                            );
-                            res
-                        }),
-                    )
+    };
+    #[doc(hidden)]
+    #[allow(
+        non_upper_case_globals,
+        unused_attributes,
+        unused_qualifications,
+        clippy::absolute_paths,
+    )]
+    const _: () = {
+        #[allow(unused_extern_crates, clippy::useless_attribute)]
+        extern crate serde as _serde;
+        #[automatically_derived]
+        impl<'de> _serde::Deserialize<'de> for BoxHKT {
+            fn deserialize<__D>(
+                __deserializer: __D,
+            ) -> _serde::__private::Result<Self, __D::Error>
+            where
+                __D: _serde::Deserializer<'de>,
+            {
+                #[allow(non_camel_case_types)]
+                #[doc(hidden)]
+                enum __Field {}
+                #[doc(hidden)]
+                struct __FieldVisitor;
+                #[automatically_derived]
+                impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
+                    type Value = __Field;
+                    fn expecting(
+                        &self,
+                        __formatter: &mut _serde::__private::Formatter,
+                    ) -> _serde::__private::fmt::Result {
+                        _serde::__private::Formatter::write_str(
+                            __formatter,
+                            "variant identifier",
+                        )
+                    }
+                    fn visit_u64<__E>(
+                        self,
+                        __value: u64,
+                    ) -> _serde::__private::Result<Self::Value, __E>
+                    where
+                        __E: _serde::de::Error,
+                    {
+                        match __value {
+                            _ => {
+                                _serde::__private::Err(
+                                    _serde::de::Error::invalid_value(
+                                        _serde::de::Unexpected::Unsigned(__value),
+                                        &"variant index 0 <= i < 0",
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    fn visit_str<__E>(
+                        self,
+                        __value: &str,
+                    ) -> _serde::__private::Result<Self::Value, __E>
+                    where
+                        __E: _serde::de::Error,
+                    {
+                        match __value {
+                            _ => {
+                                _serde::__private::Err(
+                                    _serde::de::Error::unknown_variant(__value, VARIANTS),
+                                )
+                            }
+                        }
+                    }
+                    fn visit_bytes<__E>(
+                        self,
+                        __value: &[u8],
+                    ) -> _serde::__private::Result<Self::Value, __E>
+                    where
+                        __E: _serde::de::Error,
+                    {
+                        match __value {
+                            _ => {
+                                let __value = &_serde::__private::from_utf8_lossy(__value);
+                                _serde::__private::Err(
+                                    _serde::de::Error::unknown_variant(__value, VARIANTS),
+                                )
+                            }
+                        }
+                    }
                 }
-            }
-        }
-    }
-    pub fn get_configuration<P: RefHKT>() -> Result<Settings<P>, config::ConfigError> {
-        use std::env::current_dir;
-        let configuration_directory = current_dir()
-            .unwrap_or_else(|_| {
-                {
-                    ::core::panicking::panic_fmt(
-                        format_args!(
-                            "\'{0}()\' failed",
-                            {
-                                let _ = || {
-                                    let _ = &current_dir;
-                                };
-                                "current_dir"
-                            },
-                        ),
-                    );
+                #[automatically_derived]
+                impl<'de> _serde::Deserialize<'de> for __Field {
+                    #[inline]
+                    fn deserialize<__D>(
+                        __deserializer: __D,
+                    ) -> _serde::__private::Result<Self, __D::Error>
+                    where
+                        __D: _serde::Deserializer<'de>,
+                    {
+                        _serde::Deserializer::deserialize_identifier(
+                            __deserializer,
+                            __FieldVisitor,
+                        )
+                    }
                 }
-            })
-            .join("configuration");
-        config::Config::builder()
-            .add_source(
-                config::File::from(configuration_directory.join("base")).required(true),
-            )
-            .add_source(
-                config::File::from(
-                        configuration_directory
-                            .join(
-                                std::env::var(APP_ENVIRONMENT)
-                                    .unwrap_or_else(|_| { "local".to_string() })
-                                    .pipe(Environment::try_from)
-                                    .expect("Parse env var failed.")
-                                    .as_str(),
-                            ),
-                    )
-                    .required(true),
-            )
-            .add_source(config::Environment::with_prefix("app").separator("__"))
-            .build()
-            .and_then(Config::try_deserialize::<Settings<P>>)
-    }
-    impl<P: RefHKT> DatabaseSettings<P> {
-        pub fn without_db(&self) -> PgConnectOptions {
-            PgConnectOptions::new()
-                .host(&self.host)
-                .username(&self.username)
-                .password(&self.password)
-                .port(self.port)
-                .ssl_mode(
-                    if self.require_ssl { PgSslMode::Require } else { PgSslMode::Prefer },
+                #[doc(hidden)]
+                struct __Visitor<'de> {
+                    marker: _serde::__private::PhantomData<BoxHKT>,
+                    lifetime: _serde::__private::PhantomData<&'de ()>,
+                }
+                #[automatically_derived]
+                impl<'de> _serde::de::Visitor<'de> for __Visitor<'de> {
+                    type Value = BoxHKT;
+                    fn expecting(
+                        &self,
+                        __formatter: &mut _serde::__private::Formatter,
+                    ) -> _serde::__private::fmt::Result {
+                        _serde::__private::Formatter::write_str(
+                            __formatter,
+                            "enum BoxHKT",
+                        )
+                    }
+                    fn visit_enum<__A>(
+                        self,
+                        __data: __A,
+                    ) -> _serde::__private::Result<Self::Value, __A::Error>
+                    where
+                        __A: _serde::de::EnumAccess<'de>,
+                    {
+                        _serde::__private::Result::map(
+                            _serde::de::EnumAccess::variant::<__Field>(__data),
+                            |(__impossible, _)| match __impossible {},
+                        )
+                    }
+                }
+                #[doc(hidden)]
+                const VARIANTS: &'static [&'static str] = &[];
+                _serde::Deserializer::deserialize_enum(
+                    __deserializer,
+                    "BoxHKT",
+                    VARIANTS,
+                    __Visitor {
+                        marker: _serde::__private::PhantomData::<BoxHKT>,
+                        lifetime: _serde::__private::PhantomData,
+                    },
                 )
+            }
         }
-        pub fn with_db(&self) -> PgConnectOptions {
-            self.without_db()
-                .database(&self.database_name)
-                .log_statements(log::LevelFilter::Trace)
+    };
+    pub trait Infallible: Sized + std::fmt::Debug + 'static + Eq + Ord {}
+    pub trait HKT1Unsized: Infallible {
+        type T<A: ?Sized>;
+    }
+    pub trait RefHKT: HKT1Unsized {
+        fn new<T>(v: T) -> K1<Self, T>;
+        fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T>;
+        fn deref<T: ?Sized>(value: &Self::T<T>) -> &T;
+    }
+    pub trait SharedPointerHKT: RefHKT {
+        fn try_unwrap<T>(value: Self::T<T>) -> Result<T, Self::T<T>>;
+        fn get_mut<T: ?Sized>(value: &mut Self::T<T>) -> Option<&mut T>;
+        fn make_mut<T: ?Sized + Clone>(value: &mut Self::T<T>) -> &mut T;
+        fn strong_count<T: ?Sized>(value: &Self::T<T>) -> usize;
+        fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T>;
+    }
+    /// New type wrapper for P::T<A> of HKT P
+    pub struct K1<P: HKT1Unsized, A: ?Sized>(P::T<A>);
+    #[allow(unreachable_code)]
+    #[automatically_derived]
+    impl<P: HKT1Unsized, A: ?Sized> derive_more::core::fmt::Display for K1<P, A>
+    where
+        P::T<A>: derive_more::core::fmt::Display,
+    {
+        fn fmt(
+            &self,
+            __derive_more_f: &mut derive_more::core::fmt::Formatter<'_>,
+        ) -> derive_more::core::fmt::Result {
+            let _0 = &self.0;
+            derive_more::core::fmt::Display::fmt(_0, __derive_more_f)
+        }
+    }
+    pub fn newtype<P: HKT1Unsized, A: ?Sized>(value: P::T<A>) -> K1<P, A> {
+        K1(value)
+    }
+    impl<P: HKT1Unsized, A: ?Sized> K1<P, A> {
+        pub fn inner(self) -> P::T<A> {
+            self.0
+        }
+        pub fn inner_ref(&self) -> &P::T<A> {
+            &self.0
+        }
+        pub fn inner_mut(&mut self) -> &mut P::T<A> {
+            &mut self.0
+        }
+        pub fn newtype(value: P::T<A>) -> K1<P, A> {
+            K1(value)
+        }
+    }
+    impl<P: RefHKT, A: ?Sized> Deref for K1<P, A> {
+        type Target = A;
+        fn deref(&self) -> &Self::Target {
+            P::deref(&self.0)
+        }
+    }
+    impl<P: RefHKT, A: ?Sized> AsRef<A> for K1<P, A> {
+        fn as_ref(&self) -> &A {
+            P::deref(&self.0)
+        }
+    }
+    impl<P: SharedPointerHKT, A: ?Sized> Clone for K1<P, A> {
+        fn clone(&self) -> Self {
+            P::clone(&self.0)
+        }
+    }
+    /// Consider adding PartialEqHKT to allow implementors to customize and/or optimize impl
+    impl<P: RefHKT, A: ?Sized + PartialEq> PartialEq for K1<P, A> {
+        fn eq(&self, other: &Self) -> bool {
+            self.deref().eq(other.deref())
+        }
+    }
+    impl<P: RefHKT, A: ?Sized + Eq> Eq for K1<P, A> {}
+    impl<P: RefHKT, A: ?Sized + PartialOrd> PartialOrd for K1<P, A> {
+        fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+            self.deref().partial_cmp(&other.deref())
+        }
+    }
+    impl<P: RefHKT, A: ?Sized + Ord> Ord for K1<P, A> {
+        fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+            self.deref().cmp(&other.deref())
+        }
+    }
+    impl<P: RefHKT, A: ?Sized + std::hash::Hash> std::hash::Hash for K1<P, A> {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.deref().hash(state);
+        }
+    }
+    impl<P: RefHKT, A: ?Sized + std::fmt::Debug> std::fmt::Debug for K1<P, A> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.debug_tuple({
+                    {
+                        let _ = || {
+                            let _: K1<P, A>;
+                        };
+                        "K1<P,A>"
+                    }
+                })
+                .field(&self.deref())
+                .finish()
+        }
+    }
+    impl<P: RefHKT, A: ?Sized + serde::ser::Serialize> serde::ser::Serialize
+    for K1<P, A> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.deref().serialize(serializer)
+        }
+    }
+    impl<
+        'de,
+        P: RefHKT,
+        A: ?Sized + serde::de::Deserialize<'de>,
+    > serde::de::Deserialize<'de> for K1<P, A> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            A::deserialize::<D>(deserializer).map(P::new)
+        }
+    }
+    impl<
+        'de,
+        P: RefHKT,
+        A: ?Sized + serde::de::Deserialize<'de>,
+    > serde::de::Deserialize<'de> for K1<P, [A]> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Box::<[A]>::deserialize::<D>(deserializer).map(P::from_box)
+        }
+    }
+    impl<'de, P: RefHKT> serde::de::Deserialize<'de> for K1<P, str> {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            Box::<str>::deserialize::<D>(deserializer).map(P::from_box)
+        }
+    }
+    impl Infallible for ArcHKT {}
+    impl HKT1 for ArcHKT {
+        type T<A> = Arc<A>;
+    }
+    impl hkt::Debug for ArcHKT {
+        fn fmt_k<A: ?Sized + std::fmt::Debug>(
+            value: &Self::T<A>,
+            f: &mut std::fmt::Formatter<'_>,
+        ) -> std::fmt::Result {
+            Arc::<A>::fmt(value, f)
+        }
+    }
+    impl HKT1Unsized for ArcHKT {
+        type T<A: ?Sized> = Arc<A>;
+    }
+    impl RefHKT for ArcHKT {
+        fn new<T>(v: T) -> K1<Self, T> {
+            Arc::new(v).using(K1::newtype)
+        }
+        fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T> {
+            v.using(Arc::<T>::from).using(K1::newtype)
+        }
+        fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
+            value
+        }
+    }
+    impl SharedPointerHKT for ArcHKT {
+        fn try_unwrap<T>(value: Self::T<T>) -> Result<T, Self::T<T>> {
+            Arc::try_unwrap(value)
+        }
+        fn get_mut<T: ?Sized>(value: &mut Self::T<T>) -> Option<&mut T> {
+            Arc::get_mut(value)
+        }
+        fn make_mut<T: ?Sized + Clone>(value: &mut Self::T<T>) -> &mut T {
+            Arc::make_mut(value)
+        }
+        fn strong_count<T: ?Sized>(value: &Self::T<T>) -> usize {
+            Arc::strong_count(value)
+        }
+        fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T> {
+            Arc::clone(value).using(K1::newtype)
+        }
+    }
+    impl HKT1 for RcHKT {
+        type T<A> = Rc<A>;
+    }
+    impl Infallible for RcHKT {}
+    impl hkt::Debug for RcHKT {
+        fn fmt_k<A: ?Sized + std::fmt::Debug>(
+            value: &Self::T<A>,
+            f: &mut std::fmt::Formatter<'_>,
+        ) -> std::fmt::Result {
+            Rc::<A>::fmt(value, f)
+        }
+    }
+    impl HKT1Unsized for RcHKT {
+        type T<A: ?Sized> = Rc<A>;
+    }
+    impl RefHKT for RcHKT {
+        fn new<T>(v: T) -> K1<Self, T> {
+            Rc::new(v).using(K1::newtype)
+        }
+        fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T> {
+            v.using(Rc::<T>::from).using(K1::newtype)
+        }
+        fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
+            &value
+        }
+    }
+    impl SharedPointerHKT for RcHKT {
+        fn try_unwrap<T>(value: Self::T<T>) -> Result<T, Self::T<T>> {
+            Rc::try_unwrap(value)
+        }
+        fn get_mut<T: ?Sized>(value: &mut Self::T<T>) -> Option<&mut T> {
+            Rc::get_mut(value)
+        }
+        fn make_mut<T: ?Sized + Clone>(value: &mut Self::T<T>) -> &mut T {
+            Rc::make_mut(value)
+        }
+        fn strong_count<T: ?Sized>(value: &Self::T<T>) -> usize {
+            Rc::strong_count(value)
+        }
+        fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T> {
+            Rc::clone(value).using(K1::newtype)
+        }
+    }
+    impl Infallible for BoxHKT {}
+    impl HKT1Unsized for BoxHKT {
+        type T<A: ?Sized> = Box<A>;
+    }
+    impl RefHKT for BoxHKT {
+        fn new<T>(v: T) -> K1<Self, T> {
+            K1::newtype(Box::new(v))
+        }
+        fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T> {
+            K1::newtype(v)
+        }
+        fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
+            value.deref()
         }
     }
 }

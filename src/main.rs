@@ -13,6 +13,13 @@ pub const INFO: &str = "info";
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    main_generic::<BoxHKT>().await
+}
+
+async fn main_generic<P: RefHKT>() -> std::io::Result<()>
+where 
+    P::T<str> : Send + Sync,
+    P::T<Client> : Send + Sync {
     let subscriber = get_subscriber(
         stringify!(zero2prod).into(),
         INFO.into(),
@@ -20,7 +27,7 @@ async fn main() -> std::io::Result<()> {
     );
     init_subscriber(subscriber);
 
-    let configuration = get_configuration::<BoxHKT>()
+    let configuration = get_configuration::<P>()
         .expect(
             "Failed to find configuration file.",
         );
@@ -33,21 +40,14 @@ async fn main() -> std::io::Result<()> {
             configuration.database.with_db(),
         );
 
-    fn run<P: RefHKT>(i: TcpListener, connection_pool: sqlx::Pool<sqlx::Postgres>) -> Result<actix_web::dev::Server, std::io::Error>
-    where P::T<str> : Send + Sync,
-        P::T<Client> : Send + Sync
-    {
-        startup::run::<P>(i, connection_pool, EmailClient::new(
-            Box::<str>::from("").using(P::from_box),
-            SubscriberEmail::try_from(Box::<str>::from("ursula_le_guin@gmail.com").using(P::from_box)).unwrap()
-        ))
-    }
-
     TcpListener::bind(format!(
         "{}:{}",
         configuration.application.host,
         configuration.application.port
     ))
-    .and_then(|i| run::<BoxHKT>(i, connection_pool))?
+    .and_then(|i|         startup::run::<P>(i, connection_pool, EmailClient::new(
+            Box::<str>::from("").using(P::from_box),
+            SubscriberEmail::try_from(Box::<str>::from("ursula_le_guin@gmail.com").using(P::from_box)).unwrap()
+        )))?
     .await
 }

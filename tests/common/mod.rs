@@ -49,7 +49,11 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 /// Spinup an instance of our application
 /// and returns its address(i.e.http://localhost:XXXX)
 pub async fn spawn_app() -> TestApp {
-    Lazy::force(&TRACING);
+    spawn_app_generic::<BoxHKT>().await
+}
+
+pub async fn spawn_app_generic<P: RefHKT>() -> TestApp {
+        Lazy::force(&TRACING);
 
     let listener = TcpListener::bind(
         "127.0.0.1:0",
@@ -73,20 +77,10 @@ pub async fn spawn_app() -> TestApp {
     )
     .await;
 
-    fn run<P: RefHKT>(i: TcpListener, connection_pool: sqlx::Pool<sqlx::Postgres>) -> Result<actix_web::dev::Server, std::io::Error>
-    where P::T<str> : Send + Sync,
-        P::T<Client> : Send + Sync
-    {
-        startup::run::<P>(i, connection_pool, EmailClient::new(
-            Box::<str>::from("").using(P::from_box),
-            SubscriberEmail::try_from(Box::<str>::from("ursula_le_guin@gmail.com").using(P::from_box)).unwrap()
-        ))
-    }
-
-    run::<BoxHKT>(
-        listener,
-        connection_pool.clone()
-    )
+    startup::run::<P>(listener, connection_pool.clone(), EmailClient::new(
+        Box::<str>::from("").using(P::from_box),
+        SubscriberEmail::try_from(Box::<str>::from("ursula_le_guin@gmail.com").using(P::from_box)).unwrap()
+    ))
     .map(tokio::spawn)
     .expect("Failed to start server.");
 
