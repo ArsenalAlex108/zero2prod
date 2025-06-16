@@ -1,11 +1,7 @@
 macro_rules! define_enum_derived {
     ($in: item) => {
         #[derive(
-            Debug,
-            thiserror::Error,
-            Hash,
-            PartialEq,
-            Eq,
+            Debug, thiserror::Error, Hash, PartialEq, Eq,
         )]
         $in
     };

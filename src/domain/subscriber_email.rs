@@ -5,7 +5,7 @@ use validator::ValidateEmail;
 
 use crate::{
     domain::macros::define_enum_derived,
-    hkt::{RefHKT, SharedPointerHKT, K1},
+    hkt::{K1, RefHKT, SharedPointerHKT},
 };
 
 /// Deserialization will panic if invariants are not satisfied.
@@ -20,29 +20,21 @@ use crate::{
     derive_more::AsRef,
     serde::Serialize,
 )]
-pub struct SubscriberEmail<P: RefHKT>(
-    K1<P, str>,
-);
+pub struct SubscriberEmail<P: RefHKT>(K1<P, str>);
 
 // Just an example, derived impl is possible thanks to K1<P,str> : Debug
-impl<P: RefHKT> std::fmt::Debug
-    for SubscriberEmail<P>
-{
+impl<P: RefHKT> std::fmt::Debug for SubscriberEmail<P> {
     fn fmt(
         &self,
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
-        f.debug_tuple(
-            name_of!(type SubscriberEmail<P>),
-        )
-        .field(&self.0)
-        .finish()
+        f.debug_tuple(name_of!(type SubscriberEmail<P>))
+            .field(&self.0)
+            .finish()
     }
 }
 
-impl<P: RefHKT> Deref
-    for SubscriberEmail<P>
-{
+impl<P: RefHKT> Deref for SubscriberEmail<P> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -60,33 +52,23 @@ impl<P: RefHKT> SubscriberEmail<P> {
     /// See also: try_from(K1<P,A>)
     pub fn parse(
         str: P::T<str>,
-    ) -> Result<
-        SubscriberEmail<P>,
-        SubscriberEmailParseError,
-    > {
+    ) -> Result<SubscriberEmail<P>, SubscriberEmailParseError>
+    {
         use SubscriberEmailParseError as E;
         let str = K1::<P, _>::newtype(str);
         if str.deref().validate_email() {
-            str.using(SubscriberEmail::<P>)
-                .using(Ok)
+            str.using(SubscriberEmail::<P>).using(Ok)
         } else {
-            format!(
-                "'{}' is not valid email.",
-                str.deref()
-            )
-            .using(E::Other)
-            .using(Err)
+            format!("'{}' is not valid email.", str.deref())
+                .using(E::Other)
+                .using(Err)
         }
     }
 }
 
-impl<P: RefHKT> TryFrom<&str>
-    for SubscriberEmail<P>
-{
+impl<P: RefHKT> TryFrom<&str> for SubscriberEmail<P> {
     type Error = SubscriberEmailParseError;
-    fn try_from(
-        value: &str,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         SubscriberEmail::try_from(
             value
                 .using(Box::<str>::from)
@@ -95,9 +77,7 @@ impl<P: RefHKT> TryFrom<&str>
     }
 }
 
-impl<P: RefHKT> TryFrom<String>
-    for SubscriberEmail<P>
-{
+impl<P: RefHKT> TryFrom<String> for SubscriberEmail<P> {
     type Error = SubscriberEmailParseError;
     fn try_from(
         value: String,
@@ -110,9 +90,7 @@ impl<P: RefHKT> TryFrom<String>
     }
 }
 
-impl<P: RefHKT> TryFrom<K1<P, str>>
-    for SubscriberEmail<P>
-{
+impl<P: RefHKT> TryFrom<K1<P, str>> for SubscriberEmail<P> {
     type Error = SubscriberEmailParseError;
 
     fn try_from(
@@ -123,8 +101,7 @@ impl<P: RefHKT> TryFrom<K1<P, str>>
 }
 
 /// Do not let deserialized data bypass invariants.
-impl<'de, P: RefHKT>
-    serde::Deserialize<'de>
+impl<'de, P: RefHKT> serde::Deserialize<'de>
     for SubscriberEmail<P>
 {
     fn deserialize<D>(
@@ -156,29 +133,23 @@ mod tests {
     #[test]
     fn empty_string_is_rejected() {
         let email = "";
-        assert_err!(
-            SubscriberEmail::<RcHKT>::parse(
-                email.into()
-            )
-        );
+        assert_err!(SubscriberEmail::<RcHKT>::parse(
+            email.into()
+        ));
     }
     #[test]
     fn email_missing_at_symbol_is_rejected() {
         let email = "ursuladomain.com";
-        assert_err!(
-            SubscriberEmail::<RcHKT>::parse(
-                email.into()
-            )
-        );
+        assert_err!(SubscriberEmail::<RcHKT>::parse(
+            email.into()
+        ));
     }
     #[test]
     fn email_missing_subject_is_rejected() {
         let email = "@domain.com";
-        assert_err!(
-            SubscriberEmail::<RcHKT>::parse(
-                email.into()
-            )
-        );
+        assert_err!(SubscriberEmail::<RcHKT>::parse(
+            email.into()
+        ));
     }
 
     #[derive(Debug, Clone)]
@@ -198,9 +169,7 @@ mod tests {
     fn valid_emails_are_parsed_successfully(
         email: ValidEmail,
     ) -> bool {
-        SubscriberEmail::<RcHKT>::parse(
-            email.0.into(),
-        )
-        .is_ok()
+        SubscriberEmail::<RcHKT>::parse(email.0.into())
+            .is_ok()
     }
 }

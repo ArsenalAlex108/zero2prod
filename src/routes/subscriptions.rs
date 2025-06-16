@@ -1,9 +1,7 @@
 use std::convert::identity;
 
 use crate::{
-    domain::{
-        NewSubscriber, NewSubscriberParseError,
-    },
+    domain::{NewSubscriber, NewSubscriberParseError},
     hkt::{RcHKT, SharedPointerHKT},
 };
 use actix_web::{
@@ -24,10 +22,8 @@ pub struct SubscribeFormData {
     pub name: String,
 }
 
-const SUBSCRIBE_INSTRUMENT_NAME: &str = formatcp!(
-    "Enter Route '{}':",
-    name_of!(subscribe)
-);
+const SUBSCRIBE_INSTRUMENT_NAME: &str =
+    formatcp!("Enter Route '{}':", name_of!(subscribe));
 
 #[tracing::instrument(
     name = SUBSCRIBE_INSTRUMENT_NAME,
@@ -41,10 +37,7 @@ pub async fn subscribe(
     form: web::Form<SubscribeFormData>,
     pool: web::Data<PgPool>,
 ) -> impl Responder {
-    subscribe_with_shared_pointer::<RcHKT>(
-        form, pool,
-    )
-    .await
+    subscribe_with_shared_pointer::<RcHKT>(form, pool).await
 }
 
 #[tracing::instrument(
@@ -56,7 +49,7 @@ pub async fn subscribe(
     )
 )]
 pub async fn subscribe_with_shared_pointer<
-    P: SharedPointerHKT
+    P: SharedPointerHKT,
 >(
     form: web::Form<SubscribeFormData>,
     pool: web::Data<PgPool>,
@@ -82,7 +75,10 @@ pub async fn subscribe_with_shared_pointer<
                 Err(E::NewSubscriberParseError(_)) => {
                     HttpResponse::BadRequest().finish()
                 }
-                Err(E::SqlxError(_)) => HttpResponse::InternalServerError().finish(),
+                Err(E::SqlxError(_)) => {
+                    HttpResponse::InternalServerError()
+                        .finish()
+                }
             }
         })
 }
@@ -106,9 +102,7 @@ const INSERT_SUBSCRIBER_INSTRUMENT_NAME: &str = formatcp!(
     name = INSERT_SUBSCRIBER_INSTRUMENT_NAME,
     skip(form, pool)
 )]
-pub async fn insert_subscriber<
-    P: SharedPointerHKT,
->(
+pub async fn insert_subscriber<P: SharedPointerHKT>(
     form: &NewSubscriber<P>,
     pool: &PgPool,
 ) -> Result<(), sqlx::Error> {
@@ -129,7 +123,7 @@ pub async fn insert_subscriber<
 }
 
 pub async fn confirm_subscription_token<
-    P: SharedPointerHKT
+    P: SharedPointerHKT,
 >(
     form: web::Form<Uuid>,
     pool: web::Data<PgPool>,

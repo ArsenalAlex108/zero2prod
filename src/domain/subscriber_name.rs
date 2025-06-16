@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use crate::{
     domain::macros::define_enum_derived,
-    hkt::{K1, SharedPointerHKT, RefHKT},
+    hkt::{K1, RefHKT, SharedPointerHKT},
 };
 use kust::ScopeFunctions;
 use unicode_segmentation::UnicodeSegmentation;
@@ -20,23 +20,17 @@ use unicode_segmentation::UnicodeSegmentation;
     derive_more::AsRef,
     derive_more::Display,
 )]
-pub struct SubscriberName<P:RefHKT>(
-    K1<P, str>,
-);
+pub struct SubscriberName<P: RefHKT>(K1<P, str>);
 
 const SUBSCRIBER_NAME_MAX_LENGTH: usize = 256;
-const SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS:
-    &[char] = &[
-    '/', '(', ')', '"', '<', '>', '\\', '{', '}',
-];
+const SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS: &[char] =
+    &['/', '(', ')', '"', '<', '>', '\\', '{', '}'];
 
 impl<P: RefHKT> SubscriberName<P> {
     pub fn parse(
         s: P::T<str>,
-    ) -> Result<
-        SubscriberName<P>,
-        SubscriberNameParseError,
-    > {
+    ) -> Result<SubscriberName<P>, SubscriberNameParseError>
+    {
         let s = K1::<P, _>::newtype(s);
         // `.trim()` returns a view over the input `s` without trailing
         // whitespace-like characters.
@@ -51,13 +45,15 @@ impl<P: RefHKT> SubscriberName<P> {
         // `graphemes` returns an iterator over the graphemes in the input `s`.
         // `true` specifies that we want to use the extended grapheme definition set,
         // the recommended one.
-        let is_too_long = s_ref
-            .graphemes(true)
-            .count()
+        let is_too_long = s_ref.graphemes(true).count()
             > SUBSCRIBER_NAME_MAX_LENGTH as usize;
         // Iterate over all characters in the input `s` to check if any of them matches
         // one of the characters in the forbidden array.
-        let contains_forbidden_characters = s_ref.chars().any(|c|(&*SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS).contains(&c));
+        let contains_forbidden_characters =
+            s_ref.chars().any(|c| {
+                (&*SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS)
+                    .contains(&c)
+            });
 
         use SubscriberNameParseError as E;
 
@@ -66,17 +62,14 @@ impl<P: RefHKT> SubscriberName<P> {
         } else if is_too_long {
             E::IsTooLong.using(Err)
         } else if contains_forbidden_characters {
-            E::ContainsForbiddenCharacters
-                .using(Err)
+            E::ContainsForbiddenCharacters.using(Err)
         } else {
             s.using(SubscriberName::<P>).using(Ok)
         }
     }
 }
 
-impl<P: RefHKT> Deref
-    for SubscriberName<P>
-{
+impl<P: RefHKT> Deref for SubscriberName<P> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -90,14 +83,10 @@ impl<P: SharedPointerHKT> Clone for SubscriberName<P> {
     }
 }
 
-impl<P: RefHKT> TryFrom<&str>
-    for SubscriberName<P>
-{
+impl<P: RefHKT> TryFrom<&str> for SubscriberName<P> {
     type Error = SubscriberNameParseError;
 
-    fn try_from(
-        value: &str,
-    ) -> Result<Self, Self::Error> {
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
         SubscriberName::try_from(
             value
                 .using(Box::<str>::from)
@@ -106,9 +95,7 @@ impl<P: RefHKT> TryFrom<&str>
     }
 }
 
-impl<P: RefHKT> TryFrom<String>
-    for SubscriberName<P>
-{
+impl<P: RefHKT> TryFrom<String> for SubscriberName<P> {
     type Error = SubscriberNameParseError;
     fn try_from(
         value: String,
@@ -121,9 +108,7 @@ impl<P: RefHKT> TryFrom<String>
     }
 }
 
-impl<P: RefHKT> TryFrom<K1<P, str>>
-    for SubscriberName<P>
-{
+impl<P: RefHKT> TryFrom<K1<P, str>> for SubscriberName<P> {
     type Error = SubscriberNameParseError;
 
     fn try_from(
@@ -134,8 +119,7 @@ impl<P: RefHKT> TryFrom<K1<P, str>>
 }
 
 /// Do not let deserialized data bypass invariants.
-impl<'de, P: RefHKT>
-    serde::Deserialize<'de>
+impl<'de, P: RefHKT> serde::Deserialize<'de>
     for SubscriberName<P>
 {
     fn deserialize<D>(
@@ -164,8 +148,7 @@ mod tests {
     use crate::{
         domain::subscriber_name::{
             SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS,
-            SUBSCRIBER_NAME_MAX_LENGTH,
-            SubscriberName,
+            SUBSCRIBER_NAME_MAX_LENGTH, SubscriberName,
         },
         hkt::RcHKT,
     };
@@ -174,72 +157,59 @@ mod tests {
     // Does this violates DRY?
     #[test]
     fn a_n_grapheme_long_name_is_valid() {
-        let name = "a".repeat(
-            SUBSCRIBER_NAME_MAX_LENGTH as usize,
-        );
-        assert_ok!(
-            SubscriberName::<RcHKT>::parse(
-                name.into()
-            )
-        );
+        let name =
+            "a".repeat(SUBSCRIBER_NAME_MAX_LENGTH as usize);
+        assert_ok!(SubscriberName::<RcHKT>::parse(
+            name.into()
+        ));
     }
 
     #[test]
-    fn a_name_longer_than_n_graphemes_is_rejected()
-     {
+    fn a_name_longer_than_n_graphemes_is_rejected() {
         let name = "a".repeat(
-            SUBSCRIBER_NAME_MAX_LENGTH as usize
-                + 1,
+            SUBSCRIBER_NAME_MAX_LENGTH as usize + 1,
         );
-        assert_err!(
-            SubscriberName::<RcHKT>::parse(
-                name.into()
-            )
-        );
+        assert_err!(SubscriberName::<RcHKT>::parse(
+            name.into()
+        ));
     }
 
     #[test]
     fn whitespace_only_names_are_rejected() {
         let name = " ".to_string();
-        assert_err!(
-            SubscriberName::<RcHKT>::parse(
-                name.into()
-            )
-        );
+        assert_err!(SubscriberName::<RcHKT>::parse(
+            name.into()
+        ));
     }
 
     #[test]
     fn empty_string_is_rejected() {
         let name = "".to_string();
-        assert_err!(
-            SubscriberName::<RcHKT>::parse(
-                name.into()
-            )
-        );
+        assert_err!(SubscriberName::<RcHKT>::parse(
+            name.into()
+        ));
     }
 
     #[test]
     fn names_containing_an_invalid_character_are_rejected()
-     {
-        SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS
-            .iter()
-            .for_each(|name| {
+    {
+        SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS.iter().for_each(
+            |name| {
                 let name = name.to_string();
-                assert_err!(SubscriberName::<
-                    RcHKT,
-                >::parse(
-                    name.into()
-                ));
-            })
+                assert_err!(
+                    SubscriberName::<RcHKT>::parse(
+                        name.into()
+                    )
+                );
+            },
+        )
     }
 
     #[test]
     fn a_valid_name_is_parsed_successfully() {
         let name = "Ursula Le Guin".to_string();
-        assert_ok!(
-            SubscriberName::<RcHKT>::parse(
-                name.into()
-            )
-        );
+        assert_ok!(SubscriberName::<RcHKT>::parse(
+            name.into()
+        ));
     }
 }

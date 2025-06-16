@@ -6,13 +6,13 @@ use crate::common::TestApp;
 mod common;
 
 #[actix_rt::test]
-async fn subscribe_returns_a_200_for_valid_form_data()
-{
+async fn subscribe_returns_a_200_for_valid_form_data() {
     // Arrange
     let app_address = common::spawn_app().await;
 
     let client = reqwest::Client::new();
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let body =
+        "name=le%20guin&email=ursula_le_guin%40gmail.com";
     // Act
     let response = client
         .post(format!(
@@ -36,20 +36,14 @@ async fn subscribe_returns_a_200_for_valid_form_data()
     )
     .fetch_one(&app_address.db_pool)
     .await
-    .expect(
-        "Failed to fetch saved subscriptions.",
-    );
+    .expect("Failed to fetch saved subscriptions.");
 
-    assert_eq!(
-        saved.email,
-        "ursula_le_guin@gmail.com"
-    );
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
 }
 
 #[actix_rt::test]
-async fn subscribe_returns_a_400_when_data_is_missing()
- {
+async fn subscribe_returns_a_400_when_data_is_missing() {
     // Arrange
     let app_address = common::spawn_app().await;
     let client = reqwest::Client::new();
@@ -61,13 +55,17 @@ async fn subscribe_returns_a_400_when_data_is_missing()
         ),
         ("", "missing both name and email"),
     ];
-    for (invalid_body, error_message) in
-        test_cases
-    {
+    for (invalid_body, error_message) in test_cases {
         // Act
         let response = client
-            .post(format!("{}/subscriptions", &app_address.address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
+            .post(format!(
+                "{}/subscriptions",
+                &app_address.address
+            ))
+            .header(
+                "Content-Type",
+                "application/x-www-form-urlencoded",
+            )
             .body(invalid_body)
             .send()
             .await
@@ -103,8 +101,14 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty()
     for (body, description) in test_cases {
         // Act
         let response = client
-            .post(&format!("{}/subscriptions", &app.address))
-            .header("Content-Type", "application/x-www-form-urlencoded")
+            .post(&format!(
+                "{}/subscriptions",
+                &app.address
+            ))
+            .header(
+                "Content-Type",
+                "application/x-www-form-urlencoded",
+            )
             .body(body)
             .send()
             .await
@@ -120,35 +124,55 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty()
 }
 
 #[actix_rt::test]
-async fn confirm_subscription_token_returns_200_with_correct_token() {
+async fn confirm_subscription_token_returns_200_with_correct_token()
+ {
     let (app, client) = arrange().await;
     let token = Uuid::new_v4();
     let response = client
-    .get(format!("{}/subscriptions/confirm", &app.address))
-    .header("Content-Type", "application/x-www-form-urlencoded")
-    .body(format!("subscription_token={}", token))
-    .send()
-    .await
-    .expect("Failed to execute request.");
+        .get(format!(
+            "{}/subscriptions/confirm",
+            &app.address
+        ))
+        .header(
+            "Content-Type",
+            "application/x-www-form-urlencoded",
+        )
+        .body(format!("subscription_token={}", token))
+        .send()
+        .await
+        .expect("Failed to execute request.");
 
-    assert_eq!(200, response.status().as_u16(),
-"The API did not return a 400 Bad Request when the subscription_token is correct");
+    assert_eq!(
+        200,
+        response.status().as_u16(),
+        "The API did not return a 400 Bad Request when the subscription_token is correct"
+    );
 }
 
 #[actix_rt::test]
-async fn confirm_subscription_token_returns_401_with_correct_token() {
+async fn confirm_subscription_token_returns_401_with_correct_token()
+ {
     let (app, client) = arrange().await;
     let token = Uuid::new_v4();
     let response = client
-    .get(format!("{}/subscriptions/confirm", &app.address))
-    .header("Content-Type", "application/x-www-form-urlencoded")
-    .body(format!("subscription_token={}", token))
-    .send()
-    .await
-    .expect("Failed to execute request.");
+        .get(format!(
+            "{}/subscriptions/confirm",
+            &app.address
+        ))
+        .header(
+            "Content-Type",
+            "application/x-www-form-urlencoded",
+        )
+        .body(format!("subscription_token={}", token))
+        .send()
+        .await
+        .expect("Failed to execute request.");
 
-    assert_eq!(401, response.status().as_u16(),
-"The API did not return a 401 Unauthorized when the subscription_token is incorrect");
+    assert_eq!(
+        401,
+        response.status().as_u16(),
+        "The API did not return a 401 Unauthorized when the subscription_token is incorrect"
+    );
 }
 
 async fn arrange() -> (TestApp, Client) {

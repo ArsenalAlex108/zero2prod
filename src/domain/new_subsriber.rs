@@ -1,7 +1,7 @@
 use crate::{
     domain::{
-        SubscriberEmailParseError,
-        SubscriberName, SubscriberNameParseError,
+        SubscriberEmailParseError, SubscriberName,
+        SubscriberNameParseError,
         macros::define_enum_derived,
         subscriber_email::SubscriberEmail,
     },
@@ -37,9 +37,7 @@ define_enum_derived! {
     }
 }
 
-impl<P: SharedPointerHKT> Clone
-    for NewSubscriber<P>
-{
+impl<P: SharedPointerHKT> Clone for NewSubscriber<P> {
     fn clone(&self) -> Self {
         NewSubscriber {
             email: self.email.clone(),
@@ -48,8 +46,7 @@ impl<P: SharedPointerHKT> Clone
     }
 }
 
-impl<P: RefHKT>
-    TryFrom<SubscribeFormData>
+impl<P: RefHKT> TryFrom<SubscribeFormData>
     for NewSubscriber<P>
 {
     type Error = NewSubscriberParseError;
@@ -57,21 +54,14 @@ impl<P: RefHKT>
     fn try_from(
         value: SubscribeFormData,
     ) -> Result<Self, Self::Error> {
-        SubscriberName::<P>::try_from(
-            value.name.as_str(),
-        )
-        .map_err(NewSubscriberParseError::from)
-        .and_then(|name| {
-            SubscriberEmail::<P>::try_from(
-                value.email.as_str(),
-            )
-            .map(|email| NewSubscriber {
-                email,
-                name,
+        SubscriberName::<P>::try_from(value.name.as_str())
+            .map_err(NewSubscriberParseError::from)
+            .and_then(|name| {
+                SubscriberEmail::<P>::try_from(
+                    value.email.as_str(),
+                )
+                .map(|email| NewSubscriber { email, name })
+                .map_err(NewSubscriberParseError::from)
             })
-            .map_err(
-                NewSubscriberParseError::from,
-            )
-        })
     }
 }

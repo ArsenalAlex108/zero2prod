@@ -1,18 +1,14 @@
-use std::cell::Cell;
 use std::marker::PhantomData;
 
-use actix_web::App;
 use kust::ScopeFunctions;
 use naan::HKT1;
 use naan::apply::{Applicative, Apply};
 use naan::functor::Functor;
-use naan::prelude::{Monoid, Semigroup};
+use naan::prelude::Semigroup;
 
 pub struct ValidationHKT<E>(PhantomData<E>);
 
-#[derive(
-    derive_more::From, derive_more::Into,
-)]
+#[derive(derive_more::From, derive_more::Into)]
 pub struct Validation<T, E>(Result<T, E>);
 
 impl<E> HKT1 for ValidationHKT<E> {
@@ -43,10 +39,7 @@ impl<T, E: Semigroup> Apply<ValidationHKT<E>, T>
     ) -> <ValidationHKT<E> as HKT1>::T<B>
     where
         T: naan::prelude::F1<A, Ret = B>,
-        Cloner: for<'a> naan::prelude::F1<
-                &'a A,
-                Ret = A,
-            >,
+        Cloner: for<'a> naan::prelude::F1<&'a A, Ret = A>,
     {
         // let ta = Cell::new(Some(ta));
         // self.0.map_or_else(
@@ -78,36 +71,26 @@ impl<T, E: Semigroup> Apply<ValidationHKT<E>, T>
         //     }
         // )
         match self.0 {
-            Err(e1) => {
-                match ta.0 {
-                    Err(e2) => {
-                        Err(e1.append(e2))
-                            .using(Validation)
-                    },
-                    Ok(_) => Err(e1).using(Validation),
+            Err(e1) => match ta.0 {
+                Err(e2) => {
+                    Err(e1.append(e2)).using(Validation)
                 }
+                Ok(_) => Err(e1).using(Validation),
             },
-            Ok(f) => {
-                match ta.0 {
-                    Err(e) => Err(e).using(Validation),
-                    Ok(a) => {
-                        f.call(a)
-                            .using(Ok)
-                            .using(Validation)
-                    },
+            Ok(f) => match ta.0 {
+                Err(e) => Err(e).using(Validation),
+                Ok(a) => {
+                    f.call(a).using(Ok).using(Validation)
                 }
             },
         }
     }
 }
 
-impl<T, E: Semigroup>
-    Applicative<ValidationHKT<E>, T>
+impl<T, E: Semigroup> Applicative<ValidationHKT<E>, T>
     for Validation<T, E>
 {
-    fn pure(
-        a: T,
-    ) -> <ValidationHKT<E> as HKT1>::T<T> {
+    fn pure(a: T) -> <ValidationHKT<E> as HKT1>::T<T> {
         a.using(Ok).into()
     }
 }

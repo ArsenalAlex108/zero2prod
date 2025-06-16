@@ -8,10 +8,8 @@ pub trait Pipe {
     }
 }
 
-impl<T: ?Sized> Pipe for T {
-    
-}
+impl<T: ?Sized> Pipe for T {}
 
-pub fn not_called<A: , B>(_: A) -> B {
+pub fn not_called<A, B>(_: A) -> B {
     panic!("This function is not supposed to be called.")
 }

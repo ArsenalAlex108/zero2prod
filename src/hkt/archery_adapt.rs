@@ -1,9 +1,7 @@
 use kust::ScopeFunctions;
 use naan::HKT1;
 use nameof::name_of;
-use std::{
-    fmt::Debug, ops::Deref, rc::Rc, sync::Arc,
-};
+use std::{fmt::Debug, ops::Deref, rc::Rc, sync::Arc};
 
 use crate::hkt;
 
@@ -17,32 +15,62 @@ use crate::hkt;
 //     }
 // }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Display, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum ArcHKT {}
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Display, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum RcHKT {}
-#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, derive_more::Display, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Hash,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub enum BoxHKT {}
 
-pub trait Infallible : Sized + std::fmt::Debug + 'static + Eq + Ord
-{}
-
-pub trait HKT1Unsized: Infallible
+pub trait Infallible:
+    Sized + std::fmt::Debug + 'static + Eq + Ord
 {
+}
+
+pub trait HKT1Unsized: Infallible {
     type T<A: ?Sized>;
 }
 
-pub trait RefHKT : HKT1Unsized {
+pub trait RefHKT: HKT1Unsized {
     fn new<T>(v: T) -> K1<Self, T>;
-    fn from_box<T: ?Sized>(
-        v: Box<T>,
-    ) -> K1<Self, T>;
-    fn deref<T: ?Sized>(value: &Self::T<T>)
-    -> &T;
+    fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T>;
+    fn deref<T: ?Sized>(value: &Self::T<T>) -> &T;
 }
 
-pub trait SharedPointerHKT: RefHKT
-{
+pub trait SharedPointerHKT: RefHKT {
     fn try_unwrap<T>(
         value: Self::T<T>,
     ) -> Result<T, Self::T<T>>;
@@ -52,12 +80,9 @@ pub trait SharedPointerHKT: RefHKT
     fn make_mut<T: ?Sized + Clone>(
         value: &mut Self::T<T>,
     ) -> &mut T;
-    fn strong_count<T: ?Sized>(
-        value: &Self::T<T>,
-    ) -> usize;
-    fn clone<T: ?Sized>(
-        value: &Self::T<T>,
-    ) -> K1<Self, T>;
+    fn strong_count<T: ?Sized>(value: &Self::T<T>)
+    -> usize;
+    fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T>;
 }
 
 // // pub struct SharedPointer<T>(T);
@@ -143,7 +168,8 @@ pub fn newtype<P: HKT1Unsized, A: ?Sized>(
 
 #[allow(unreachable_code)]
 #[automatically_derived]
-impl<P: HKT1Unsized, A: ?Sized> derive_more::core::fmt::Display for K1<P, A>
+impl<P: RefHKT, A: ?Sized> derive_more::core::fmt::Display
+    for K1<P, A>
 where
     A: derive_more::core::fmt::Display,
 {
@@ -151,7 +177,10 @@ where
         &self,
         __derive_more_f: &mut derive_more::core::fmt::Formatter<'_>,
     ) -> derive_more::core::fmt::Result {
-        derive_more::core::fmt::Display::fmt(self.deref(), __derive_more_f)
+        derive_more::core::fmt::Display::fmt(
+            self.deref(),
+            __derive_more_f,
+        )
     }
 }
 
@@ -215,47 +244,38 @@ impl<P: HKT1Unsized, A: ?Sized> K1<P, A> {
 // {
 // }
 
-impl<P: RefHKT, A: ?Sized> Deref
-    for K1<P, A>
-{
+impl<P: RefHKT, A: ?Sized> Deref for K1<P, A> {
     type Target = A;
     fn deref(&self) -> &Self::Target {
         P::deref(&self.0)
     }
 }
 
-impl<P: RefHKT, A: ?Sized> AsRef<A>
-    for K1<P, A>
-{
+impl<P: RefHKT, A: ?Sized> AsRef<A> for K1<P, A> {
     fn as_ref(&self) -> &A {
         P::deref(&self.0)
     }
 }
 
-impl<P: SharedPointerHKT, A: ?Sized> Clone
-    for K1<P, A>
-{
+impl<P: SharedPointerHKT, A: ?Sized> Clone for K1<P, A> {
     fn clone(&self) -> Self {
         P::clone(&self.0)
     }
 }
 
 /// Consider adding PartialEqHKT to allow implementors to customize and/or optimize impl
-impl<P: RefHKT, A: ?Sized + PartialEq>
-    PartialEq for K1<P, A>
+impl<P: RefHKT, A: ?Sized + PartialEq> PartialEq
+    for K1<P, A>
 {
     fn eq(&self, other: &Self) -> bool {
         self.deref().eq(other.deref())
     }
 }
 
-impl<P: RefHKT, A: ?Sized + Eq> Eq
-    for K1<P, A>
-{
-}
+impl<P: RefHKT, A: ?Sized + Eq> Eq for K1<P, A> {}
 
-impl<P: RefHKT, A: ?Sized + PartialOrd>
-    PartialOrd for K1<P, A>
+impl<P: RefHKT, A: ?Sized + PartialOrd> PartialOrd
+    for K1<P, A>
 {
     fn partial_cmp(
         &self,
@@ -265,34 +285,22 @@ impl<P: RefHKT, A: ?Sized + PartialOrd>
     }
 }
 
-impl<P: RefHKT, A: ?Sized + Ord> Ord
-    for K1<P, A>
-{
-    fn cmp(
-        &self,
-        other: &Self,
-    ) -> std::cmp::Ordering {
+impl<P: RefHKT, A: ?Sized + Ord> Ord for K1<P, A> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.deref().cmp(&other.deref())
     }
 }
 
-impl<
-    P: RefHKT,
-    A: ?Sized + std::hash::Hash,
-> std::hash::Hash for K1<P, A>
+impl<P: RefHKT, A: ?Sized + std::hash::Hash> std::hash::Hash
+    for K1<P, A>
 {
-    fn hash<H: std::hash::Hasher>(
-        &self,
-        state: &mut H,
-    ) {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.deref().hash(state);
     }
 }
 
-impl<
-    P: RefHKT,
-    A: ?Sized + std::fmt::Debug,
-> std::fmt::Debug for K1<P, A>
+impl<P: RefHKT, A: ?Sized + std::fmt::Debug> std::fmt::Debug
+    for K1<P, A>
 {
     fn fmt(
         &self,
@@ -304,10 +312,8 @@ impl<
     }
 }
 
-impl<
-    P: RefHKT,
-    A: ?Sized + serde::ser::Serialize,
-> serde::ser::Serialize for K1<P, A>
+impl<P: RefHKT, A: ?Sized + serde::ser::Serialize>
+    serde::ser::Serialize for K1<P, A>
 {
     fn serialize<S>(
         &self,
@@ -332,8 +338,7 @@ impl<
     where
         D: serde::Deserializer<'de>,
     {
-        A::deserialize::<D>(deserializer)
-            .map(P::new)
+        A::deserialize::<D>(deserializer).map(P::new)
     }
 }
 
@@ -354,10 +359,8 @@ impl<
     }
 }
 
-impl<
-    'de,
-    P: RefHKT
-> serde::de::Deserialize<'de> for K1<P, str>
+impl<'de, P: RefHKT> serde::de::Deserialize<'de>
+    for K1<P, str>
 {
     fn deserialize<D>(
         deserializer: D,
@@ -370,9 +373,7 @@ impl<
     }
 }
 
-impl Infallible for ArcHKT {
-    
-}
+impl Infallible for ArcHKT {}
 
 impl HKT1 for ArcHKT {
     type T<A> = Arc<A>;
@@ -395,15 +396,11 @@ impl RefHKT for ArcHKT {
     fn new<T>(v: T) -> K1<Self, T> {
         Arc::new(v).using(K1::newtype)
     }
-    fn from_box<T: ?Sized>(
-        v: Box<T>,
-    ) -> K1<Self, T> {
+    fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T> {
         v.using(Arc::<T>::from).using(K1::newtype)
     }
 
-    fn deref<T: ?Sized>(
-        value: &Self::T<T>,
-    ) -> &T {
+    fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
         value
     }
 }
@@ -433,9 +430,7 @@ impl SharedPointerHKT for ArcHKT {
         Arc::strong_count(value)
     }
 
-    fn clone<T: ?Sized>(
-        value: &Self::T<T>,
-    ) -> K1<Self, T> {
+    fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T> {
         Arc::clone(value).using(K1::newtype)
     }
 }
@@ -444,9 +439,7 @@ impl HKT1 for RcHKT {
     type T<A> = Rc<A>;
 }
 
-impl Infallible for RcHKT {
-    
-}
+impl Infallible for RcHKT {}
 
 impl hkt::Debug for RcHKT {
     fn fmt_k<A: ?Sized + std::fmt::Debug>(
@@ -462,26 +455,20 @@ impl HKT1Unsized for RcHKT {
 }
 
 impl RefHKT for RcHKT {
-    
     fn new<T>(v: T) -> K1<Self, T> {
         Rc::new(v).using(K1::newtype)
     }
 
-    fn from_box<T: ?Sized>(
-        v: Box<T>,
-    ) -> K1<Self, T> {
+    fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T> {
         v.using(Rc::<T>::from).using(K1::newtype)
     }
 
-    fn deref<T: ?Sized>(
-        value: &Self::T<T>,
-    ) -> &T {
+    fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
         &value
     }
 }
 
 impl SharedPointerHKT for RcHKT {
-
     fn try_unwrap<T>(
         value: Self::T<T>,
     ) -> Result<T, Self::T<T>> {
@@ -506,16 +493,12 @@ impl SharedPointerHKT for RcHKT {
         Rc::strong_count(value)
     }
 
-    fn clone<T: ?Sized>(
-        value: &Self::T<T>,
-    ) -> K1<Self, T> {
+    fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T> {
         Rc::clone(value).using(K1::newtype)
     }
 }
 
-impl Infallible for BoxHKT {
-
-}
+impl Infallible for BoxHKT {}
 
 impl HKT1Unsized for BoxHKT {
     type T<A: ?Sized> = Box<A>;
@@ -526,14 +509,11 @@ impl RefHKT for BoxHKT {
         K1::newtype(Box::new(v))
     }
 
-    fn from_box<T: ?Sized>(
-        v: Box<T>,
-    ) -> K1<Self, T> {
+    fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T> {
         K1::newtype(v)
     }
 
-    fn deref<T: ?Sized>(value: &Self::T<T>)
-    -> &T {
+    fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
         value.deref()
     }
 }
@@ -545,9 +525,7 @@ mod tests {
 
     use super::ArcHKT;
     use kust::ScopeFunctions;
-    struct MyStruct<PointerK>(
-        PointerK::T<Box<str>>,
-    )
+    struct MyStruct<PointerK>(PointerK::T<Box<str>>)
     where
         PointerK: super::SharedPointerHKT;
 

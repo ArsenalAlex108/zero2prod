@@ -1,17 +1,17 @@
 use kust::ScopeFunctions;
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use sqlx::{
-    database, Connection, Executor, PgConnection, PgPool
-};
-use std::{net::TcpListener, sync::Arc};
+use sqlx::{Connection, Executor, PgConnection, PgPool};
+use std::net::TcpListener;
+use std::ops::Deref;
 use uuid::Uuid;
 use zero2prod::{
-    configuration::{
-        get_configuration, DatabaseSettings
-    }, domain::SubscriberEmail, email_client::EmailClient, hkt::{ArcHKT, BoxHKT, RefHKT, K1}, startup
+    configuration::{DatabaseSettings, get_configuration},
+    domain::SubscriberEmail,
+    email_client::EmailClient,
+    hkt::{BoxHKT, RefHKT},
+    startup,
 };
-use std::ops::Deref;
 
 #[allow(dead_code, reason = "Used by tests.")]
 pub struct TestApp {
@@ -32,9 +32,7 @@ macro_rules! init_subscriber_from_env {
                 DEBUG.into(),
                 $n,
             );
-        zero2prod::telemetry::init_subscriber(
-            subscriber,
-        );
+        zero2prod::telemetry::init_subscriber(subscriber);
     }};
 }
 
@@ -52,35 +50,46 @@ pub async fn spawn_app() -> TestApp {
     spawn_app_generic::<BoxHKT>().await
 }
 
-pub async fn spawn_app_generic<P: RefHKT>() -> TestApp {
-        Lazy::force(&TRACING);
+pub async fn spawn_app_generic<P: RefHKT>() -> TestApp
+where
+    P::T<str>: Send + Sync,
+    P::T<Client>: Send + Sync,
+{
+    Lazy::force(&TRACING);
 
-    let listener = TcpListener::bind(
-        "127.0.0.1:0",
-    )
-    .expect("Failed to bind to random port");
-    let port =
-        listener.local_addr().unwrap().port();
-    let address =
-        format!("http://127.0.0.1:{}", port);
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .expect("Failed to bind to random port");
+    let port = listener.local_addr().unwrap().port();
+    let address = format!("http://127.0.0.1:{}", port);
 
     let configuration = get_configuration::<BoxHKT>()
         .expect("Failed to read configuration");
 
     let database = DatabaseSettings::<BoxHKT> {
-        database_name:Uuid::new_v4().to_string().using(Box::<str>::from).using(BoxHKT::from_box),
+        database_name: Uuid::new_v4()
+            .to_string()
+            .using(Box::<str>::from)
+            .using(BoxHKT::from_box),
         ..configuration.database
     };
 
-    let connection_pool = configure_database(
-        &database,
-    )
-    .await;
+    let connection_pool =
+        configure_database(&database).await;
 
-    startup::run::<P>(listener, connection_pool.clone(), EmailClient::new(
-        Box::<str>::from("").using(P::from_box),
-        SubscriberEmail::try_from(Box::<str>::from("ursula_le_guin@gmail.com").using(P::from_box)).unwrap()
-    ))
+    startup::run::<P>(
+        listener,
+        connection_pool.clone(),
+        EmailClient::new(
+            Box::<str>::from("").using(P::from_box),
+            SubscriberEmail::try_from(
+                Box::<str>::from(
+                    "ursula_le_guin@gmail.com",
+                )
+                .using(P::from_box),
+            )
+            .unwrap(),
+        ),
+    )
     .map(tokio::spawn)
     .expect("Failed to start server.");
 
@@ -95,11 +104,9 @@ pub async fn configure_database<P: RefHKT>(
 ) -> PgPool {
     // Create database
     let mut connection =
-        PgConnection::connect_with(
-            &config.without_db(),
-        )
-        .await
-        .expect("Failed to connect to Postgres");
+        PgConnection::connect_with(&config.without_db())
+            .await
+            .expect("Failed to connect to Postgres");
     connection
         .execute(
             format!(
@@ -114,9 +121,7 @@ pub async fn configure_database<P: RefHKT>(
     let connection_pool =
         PgPool::connect_with(config.with_db())
             .await
-            .expect(
-                "Failed to connect to Postgres.",
-            );
+            .expect("Failed to connect to Postgres.");
 
     sqlx::migrate!("./migrations")
         .run(&connection_pool)

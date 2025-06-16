@@ -1,8 +1,6 @@
 use const_format::formatcp;
 use nameof::name_of;
-use tracing::{
-    Subscriber, subscriber::set_global_default,
-};
+use tracing::{Subscriber, subscriber::set_global_default};
 use tracing_bunyan_formatter::{
     BunyanFormattingLayer, JsonStorageLayer,
 };
@@ -15,16 +13,10 @@ use tracing_subscriber::{
 pub fn get_subscriber(
     name: String,
     env_filter: String,
-    sink: impl for<'a> MakeWriter<'a>
-    + Send
-    + Sync
-    + 'static,
+    sink: impl for<'a> MakeWriter<'a> + Send + Sync + 'static,
 ) -> impl Subscriber + Send + Sync {
-    let env_filter =
-        EnvFilter::try_from_default_env()
-            .unwrap_or_else(|_| {
-                EnvFilter::new(env_filter)
-            });
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(env_filter));
 
     let formatting_layer =
         BunyanFormattingLayer::new(name, sink);

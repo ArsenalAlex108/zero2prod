@@ -1,4 +1,4 @@
-use std::{net::TcpListener, sync::Arc};
+use std::net::TcpListener;
 
 use actix_web::{
     App, HttpServer,
@@ -11,12 +11,9 @@ use sqlx::PgPool;
 use tracing_actix_web::TracingLogger;
 
 use crate::{
-    email_client::{self, EmailClient},
-    hkt::{ArcHKT, RcHKT, RefHKT},
-    routes::{
-        confirm_subscription_token, health_check,
-        subscribe,
-    },
+    email_client::EmailClient,
+    hkt::{RcHKT, RefHKT},
+    routes::{health_check, subscribe},
 };
 
 type DefaultSharedPointerHKT = RcHKT;
@@ -31,8 +28,7 @@ where
     P::T<str>: Send + Sync,
 {
     let db_pool = db_pool.using(web::Data::new);
-    let email_client =
-        email_client.using(web::Data::new);
+    let email_client = email_client.using(web::Data::new);
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())

@@ -1,25 +1,16 @@
 use config::Config;
-use const_format::formatcp;
-use naan::apply::Apply;
-use naan::fun::F2Once;
-use naan::semigroup::Semigroup;
 use nameof::name_of;
-use serde::de;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::ConnectOptions;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use std::convert::TryFrom;
-use std::marker::PhantomData;
 use tracing_log::log;
 
 use crate::domain::{
     SubscriberEmail, SubscriberEmailParseError,
 };
-use crate::hkt::{
-    K1, RefHKT, SharedPointerHKT, Validation, ValidationHKT,
-};
-use crate::serde::DeserializeError;
-use crate::utils::{self, Pipe};
+use crate::hkt::{K1, RefHKT, SharedPointerHKT};
+use crate::utils::Pipe;
 
 pub mod serde_impl;
 
@@ -163,8 +154,7 @@ mod tests {
     use nameof::name_of;
 
     use crate::{
-        configuration::EmailClientSettings,
-        hkt::{BoxHKT, RcHKT},
+        configuration::EmailClientSettings, hkt::RcHKT,
     };
 
     #[test]
@@ -194,6 +184,10 @@ mod tests {
                 >,
             )
             .unwrap();
-        print!("{}, {}", value.base_url.deref(), value.sender_email.deref())
+        print!(
+            "{}, {}",
+            value.base_url.deref(),
+            value.sender_email.deref()
+        )
     }
 }
