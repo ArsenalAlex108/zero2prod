@@ -6,9 +6,9 @@ use sqlx::postgres::PgPoolOptions;
 use zero2prod::{
     configuration::get_configuration,
     domain::SubscriberEmail,
-    email_client::EmailClient,
-    hkt::{BoxHKT, RefHKT},
-    startup,
+    email_client::{self, EmailClient},
+    hkt::{ArcHKT, BoxHKT, RefHKT, SharedPointerHKT},
+    startup::Application,
     telemetry::{get_subscriber, init_subscriber},
 };
 
@@ -16,10 +16,11 @@ pub const INFO: &str = "info";
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    main_generic::<BoxHKT>().await
+    main_generic::<ArcHKT>().await
 }
 
-async fn main_generic<P: RefHKT>() -> std::io::Result<()>
+async fn main_generic<P: SharedPointerHKT>()
+-> std::io::Result<()>
 where
     P::T<str>: Send + Sync,
     P::T<Client>: Send + Sync,
@@ -34,32 +35,7 @@ where
     let configuration = get_configuration::<P>()
         .expect("Failed to find configuration file.");
 
-    let connection_pool = PgPoolOptions::new()
-        .idle_timeout(std::time::Duration::from_secs(2))
-        .connect_lazy_with(
-            configuration.database.with_db(),
-        );
-
-    TcpListener::bind(format!(
-        "{}:{}",
-        configuration.application.host,
-        configuration.application.port
-    ))
-    .and_then(|i| {
-        startup::run::<P>(
-            i,
-            connection_pool,
-            EmailClient::new(
-                Box::<str>::from("").using(P::from_box),
-                SubscriberEmail::try_from(
-                    Box::<str>::from(
-                        "ursula_le_guin@gmail.com",
-                    )
-                    .using(P::from_box),
-                )
-                .unwrap(),
-            ),
-        )
-    })?
-    .await
+    Application::build(&configuration)?
+        .run_until_stopped()
+        .await
 }

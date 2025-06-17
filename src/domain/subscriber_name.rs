@@ -46,12 +46,12 @@ impl<P: RefHKT> SubscriberName<P> {
         // `true` specifies that we want to use the extended grapheme definition set,
         // the recommended one.
         let is_too_long = s_ref.graphemes(true).count()
-            > SUBSCRIBER_NAME_MAX_LENGTH as usize;
+            > SUBSCRIBER_NAME_MAX_LENGTH;
         // Iterate over all characters in the input `s` to check if any of them matches
         // one of the characters in the forbidden array.
         let contains_forbidden_characters =
             s_ref.chars().any(|c| {
-                (&*SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS)
+                SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS
                     .contains(&c)
             });
 
@@ -79,7 +79,7 @@ impl<P: RefHKT> Deref for SubscriberName<P> {
 
 impl<P: SharedPointerHKT> Clone for SubscriberName<P> {
     fn clone(&self) -> Self {
-        Self(P::clone(&self.0.inner_ref()))
+        Self(P::clone(self.0.inner_ref()))
     }
 }
 
@@ -138,7 +138,7 @@ define_enum_derived! {
         IsEmptyOrWhitespace,
         #[error("Name is longer than {}", SUBSCRIBER_NAME_MAX_LENGTH)]
         IsTooLong,
-        #[error("Name must not contain forbidden characters: [{}]", SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS.into_iter().map(char::to_string).collect::<Vec<_>>().join(", "))]
+        #[error("Name must not contain forbidden characters: [{}]", SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS.iter().map(char::to_string).collect::<Vec<_>>().join(", "))]
         ContainsForbiddenCharacters,
     }
 }
@@ -157,8 +157,7 @@ mod tests {
     // Does this violates DRY?
     #[test]
     fn a_n_grapheme_long_name_is_valid() {
-        let name =
-            "a".repeat(SUBSCRIBER_NAME_MAX_LENGTH as usize);
+        let name = "a".repeat(SUBSCRIBER_NAME_MAX_LENGTH);
         assert_ok!(SubscriberName::<RcHKT>::parse(
             name.into()
         ));
@@ -166,9 +165,8 @@ mod tests {
 
     #[test]
     fn a_name_longer_than_n_graphemes_is_rejected() {
-        let name = "a".repeat(
-            SUBSCRIBER_NAME_MAX_LENGTH as usize + 1,
-        );
+        let name =
+            "a".repeat(SUBSCRIBER_NAME_MAX_LENGTH + 1);
         assert_err!(SubscriberName::<RcHKT>::parse(
             name.into()
         ));

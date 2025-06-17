@@ -1,9 +1,7 @@
 use reqwest::Client;
 use uuid::Uuid;
 
-use crate::common::TestApp;
-
-mod common;
+use crate::common::{self, TestApp};
 
 #[actix_rt::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
@@ -101,10 +99,7 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty()
     for (body, description) in test_cases {
         // Act
         let response = client
-            .post(&format!(
-                "{}/subscriptions",
-                &app.address
-            ))
+            .post(format!("{}/subscriptions", &app.address))
             .header(
                 "Content-Type",
                 "application/x-www-form-urlencoded",
@@ -145,7 +140,7 @@ async fn confirm_subscription_token_returns_200_with_correct_token()
     assert_eq!(
         200,
         response.status().as_u16(),
-        "The API did not return a 400 Bad Request when the subscription_token is correct"
+        "The API did not return a 200 OK when the subscription_token is correct"
     );
 }
 

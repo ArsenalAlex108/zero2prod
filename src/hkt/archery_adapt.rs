@@ -68,6 +68,13 @@ pub trait RefHKT: HKT1Unsized {
     fn new<T>(v: T) -> K1<Self, T>;
     fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T>;
     fn deref<T: ?Sized>(value: &Self::T<T>) -> &T;
+
+    fn from_string(v: String) -> K1<Self, str> {
+        Self::from_box(Box::<str>::from(v))
+    }
+    fn from_vec<T>(v: Vec<T>) -> K1<Self, [T]> {
+        Self::from_box(Box::<[T]>::from(v))
+    }
 }
 
 pub trait SharedPointerHKT: RefHKT {
@@ -77,9 +84,8 @@ pub trait SharedPointerHKT: RefHKT {
     fn get_mut<T: ?Sized>(
         value: &mut Self::T<T>,
     ) -> Option<&mut T>;
-    fn make_mut<T: ?Sized + Clone>(
-        value: &mut Self::T<T>,
-    ) -> &mut T;
+    fn make_mut<T: Clone>(value: &mut Self::T<T>)
+    -> &mut T;
     fn strong_count<T: ?Sized>(value: &Self::T<T>)
     -> usize;
     fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T>;
@@ -281,13 +287,13 @@ impl<P: RefHKT, A: ?Sized + PartialOrd> PartialOrd
         &self,
         other: &Self,
     ) -> Option<std::cmp::Ordering> {
-        self.deref().partial_cmp(&other.deref())
+        self.deref().partial_cmp(other.deref())
     }
 }
 
 impl<P: RefHKT, A: ?Sized + Ord> Ord for K1<P, A> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.deref().cmp(&other.deref())
+        self.deref().cmp(other.deref())
     }
 }
 
@@ -326,11 +332,8 @@ impl<P: RefHKT, A: ?Sized + serde::ser::Serialize>
     }
 }
 
-impl<
-    'de,
-    P: RefHKT,
-    A: ?Sized + serde::de::Deserialize<'de>,
-> serde::de::Deserialize<'de> for K1<P, A>
+impl<'de, P: RefHKT, A: serde::de::Deserialize<'de>>
+    serde::de::Deserialize<'de> for K1<P, A>
 {
     fn deserialize<D>(
         deserializer: D,
@@ -342,11 +345,8 @@ impl<
     }
 }
 
-impl<
-    'de,
-    P: RefHKT,
-    A: ?Sized + serde::de::Deserialize<'de>,
-> serde::de::Deserialize<'de> for K1<P, [A]>
+impl<'de, P: RefHKT, A: serde::de::Deserialize<'de>>
+    serde::de::Deserialize<'de> for K1<P, [A]>
 {
     fn deserialize<D>(
         deserializer: D,
@@ -418,7 +418,7 @@ impl SharedPointerHKT for ArcHKT {
         Arc::get_mut(value)
     }
 
-    fn make_mut<T: ?Sized + Clone>(
+    fn make_mut<T: Clone>(
         value: &mut Self::T<T>,
     ) -> &mut T {
         Arc::make_mut(value)
@@ -464,7 +464,7 @@ impl RefHKT for RcHKT {
     }
 
     fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
-        &value
+        value
     }
 }
 
@@ -481,7 +481,7 @@ impl SharedPointerHKT for RcHKT {
         Rc::get_mut(value)
     }
 
-    fn make_mut<T: ?Sized + Clone>(
+    fn make_mut<T: Clone>(
         value: &mut Self::T<T>,
     ) -> &mut T {
         Rc::make_mut(value)

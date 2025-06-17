@@ -1,19 +1,24 @@
 use kust::ScopeFunctions;
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use sqlx::{Connection, Executor, PgConnection, PgPool};
+use sqlx::{
+    Connection, Executor, PgConnection, PgPool, database,
+};
 use std::net::TcpListener;
 use std::ops::Deref;
 use uuid::Uuid;
 use zero2prod::{
-    configuration::{DatabaseSettings, get_configuration},
+    configuration::{
+        self, ApplicationSettings, DatabaseSettings,
+        Settings, get_configuration,
+    },
     domain::SubscriberEmail,
     email_client::EmailClient,
-    hkt::{BoxHKT, RefHKT},
-    startup,
+    hkt::{ArcHKT, BoxHKT, K1, RefHKT, SharedPointerHKT},
+    startup::{self, Application},
+    utils::Pipe,
 };
 
-#[allow(dead_code, reason = "Used by tests.")]
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
@@ -47,55 +52,65 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 /// Spinup an instance of our application
 /// and returns its address(i.e.http://localhost:XXXX)
 pub async fn spawn_app() -> TestApp {
-    spawn_app_generic::<BoxHKT>().await
+    spawn_app_generic::<ArcHKT>().await
 }
 
-pub async fn spawn_app_generic<P: RefHKT>() -> TestApp
+pub async fn spawn_app_generic<P: SharedPointerHKT>()
+-> TestApp
 where
     P::T<str>: Send + Sync,
     P::T<Client>: Send + Sync,
 {
     Lazy::force(&TRACING);
 
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .expect("Failed to bind to random port");
-    let port = listener.local_addr().unwrap().port();
-    let address = format!("http://127.0.0.1:{}", port);
-
-    let configuration = get_configuration::<BoxHKT>()
+    let configuration = get_configuration::<P>()
         .expect("Failed to read configuration");
 
-    let database = DatabaseSettings::<BoxHKT> {
-        database_name: Uuid::new_v4()
-            .to_string()
-            .using(Box::<str>::from)
-            .using(BoxHKT::from_box),
-        ..configuration.database
+    // Least efficient (2 copies!)
+    let database = configuration
+        .database
+        .deref()
+        .clone()
+        .pipe(|i| DatabaseSettings {
+            database_name: Uuid::new_v4()
+                .to_string()
+                .pipe(P::from_string),
+            ..i
+        })
+        .pipe(P::new);
+
+    // Slightly less efficient (unneeded copied fields)
+    let application = {
+        let mut application =
+            configuration.application.deref().clone();
+        application.port = 0;
+        application.pipe(P::new)
     };
 
-    let connection_pool =
-        configure_database(&database).await;
+    // Most efficient (with no mutations)
+    let configuration = Settings {
+        database,
+        application,
+        email_client: configuration.email_client,
+    };
 
-    startup::run::<P>(
-        listener,
-        connection_pool.clone(),
-        EmailClient::new(
-            Box::<str>::from("").using(P::from_box),
-            SubscriberEmail::try_from(
-                Box::<str>::from(
-                    "ursula_le_guin@gmail.com",
-                )
-                .using(P::from_box),
-            )
-            .unwrap(),
-        ),
-    )
-    .map(tokio::spawn)
-    .expect("Failed to start server.");
+    configure_database(&configuration.database).await;
+
+    let application = Application::build(&configuration)
+        .expect("Application should build successfully.");
+    // Get the port before spawning the application
+    let address =
+        format!("http://127.0.0.1:{}", application.port());
+
+    application
+        .pipe(Application::run_until_stopped)
+        .pipe(tokio::spawn);
 
     TestApp {
         address,
-        db_pool: connection_pool,
+        db_pool: startup::get_connection_pool(
+            &configuration.database,
+        ),
     }
 }
 

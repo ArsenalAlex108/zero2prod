@@ -1,4 +1,4 @@
-mod common;
+use crate::common;
 
 //`actix_rt::test`isthetestingequivalentof`actix_web::main`.
 // Italsosparesyoufromhavingtospecifythe`#[test]` attribute.

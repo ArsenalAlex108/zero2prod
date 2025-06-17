@@ -1,4 +1,5 @@
 pub trait Pipe {
+    #[inline]
     fn pipe<F, R>(self, f: F) -> R
     where
         Self: Sized,

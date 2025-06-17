@@ -3,7 +3,6 @@ use crate::hkt::RefHKT;
 
 /// #derive generated code with incorrect constraint P : serde::de::Deserialize<>
 /// Below is generated code with above constraint removed.
-
 #[doc(hidden)]
 #[allow(
     non_upper_case_globals,
@@ -176,7 +175,7 @@ const _: () = {
                         __A: _serde::de::SeqAccess<'de>,
                     {
                     let __field0 = match _serde::de::SeqAccess::next_element::<
-                            DatabaseSettings<P>,
+                            K1<P, DatabaseSettings<P>>,
                         >(&mut __seq)? {
                             _serde::__private::Some(__value) => __value,
                             _serde::__private::None => {
@@ -189,7 +188,7 @@ const _: () = {
                             }
                         };
                     let __field1 = match _serde::de::SeqAccess::next_element::<
-                            ApplicationSettings<P>,
+                            K1<P, ApplicationSettings<P>>,
                         >(&mut __seq)? {
                             _serde::__private::Some(__value) => __value,
                             _serde::__private::None => {
@@ -202,7 +201,7 @@ const _: () = {
                             }
                         };
                     let __field2 = match _serde::de::SeqAccess::next_element::<
-                            EmailClientSettings<P>,
+                            K1<P, EmailClientSettings<P>>,
                         >(&mut __seq)? {
                             _serde::__private::Some(__value) => __value,
                             _serde::__private::None => {
@@ -229,13 +228,13 @@ const _: () = {
                         __A: _serde::de::MapAccess<'de>,
                     {
                     let mut __field0: _serde::__private::Option<
-                            DatabaseSettings<P>,
+                            K1<P, DatabaseSettings<P>>,
                         > = _serde::__private::None;
                     let mut __field1: _serde::__private::Option<
-                            ApplicationSettings<P>,
+                            K1<P, ApplicationSettings<P>>,
                         > = _serde::__private::None;
                     let mut __field2: _serde::__private::Option<
-                            EmailClientSettings<P>,
+                            K1<P, EmailClientSettings<P>>,
                         > = _serde::__private::None;
                     while let _serde::__private::Some(
                         __key,
@@ -257,7 +256,7 @@ const _: () = {
                                     }
                                 __field0 = _serde::__private::Some(
                                         _serde::de::MapAccess::next_value::<
-                                            DatabaseSettings<P>,
+                                            K1<P, DatabaseSettings<P>>,
                                         >(&mut __map)?,
                                     );
                             }
@@ -271,7 +270,7 @@ const _: () = {
                                     }
                                 __field1 = _serde::__private::Some(
                                         _serde::de::MapAccess::next_value::<
-                                            ApplicationSettings<P>,
+                                            K1<P, ApplicationSettings<P>>,
                                         >(&mut __map)?,
                                     );
                             }
@@ -285,7 +284,7 @@ const _: () = {
                                     }
                                 __field2 = _serde::__private::Some(
                                         _serde::de::MapAccess::next_value::<
-                                            EmailClientSettings<P>,
+                                            K1<P, EmailClientSettings<P>>,
                                         >(&mut __map)?,
                                     );
                             }
@@ -376,7 +375,7 @@ const _: () = {
             #[doc(hidden)]
             struct __FieldVisitor;
             #[automatically_derived]
-            impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
+            impl _serde::de::Visitor<'_> for __FieldVisitor {
                 type Value = __Field;
                 fn expecting(
                     &self,
@@ -492,6 +491,7 @@ const _: () = {
                     where
                         __A: _serde::de::SeqAccess<'de>,
                     {
+                    #[allow(clippy::blocks_in_conditions)]
                     let __field0 = match {
                         #[doc(hidden)]
                         struct __DeserializeWith<'de, P: RefHKT>
@@ -916,6 +916,8 @@ const _: () = {
                                 );
                             }
                         };
+
+                    #[allow(clippy::blocks_in_conditions)]
                     let __field2 = match {
                         #[doc(hidden)]
                         struct __DeserializeWith<'de, P: RefHKT>
@@ -1253,6 +1255,8 @@ const _: () = {
             enum __Field {
                 __field0,
                 __field1,
+                __field2,
+                __field3,
                 __ignore,
             }
             #[doc(hidden)]
@@ -1284,6 +1288,12 @@ const _: () = {
                         1u64 => _serde::__private::Ok(
                             __Field::__field1,
                         ),
+                        2u64 => _serde::__private::Ok(
+                            __Field::__field2,
+                        ),
+                        3u64 => _serde::__private::Ok(
+                            __Field::__field3,
+                        ),
                         _ => _serde::__private::Ok(
                             __Field::__ignore,
                         ),
@@ -1307,6 +1317,16 @@ const _: () = {
                                 __Field::__field1,
                             )
                         }
+                        "authorization_token" => {
+                            _serde::__private::Ok(
+                                __Field::__field2,
+                            )
+                        }
+                        "timeout_milliseconds" => {
+                            _serde::__private::Ok(
+                                __Field::__field3,
+                            )
+                        }
                         _ => _serde::__private::Ok(
                             __Field::__ignore,
                         ),
@@ -1328,6 +1348,16 @@ const _: () = {
                         b"sender_email" => {
                             _serde::__private::Ok(
                                 __Field::__field1,
+                            )
+                        }
+                        b"authorization_token" => {
+                            _serde::__private::Ok(
+                                __Field::__field2,
+                            )
+                        }
+                        b"timeout_milliseconds" => {
+                            _serde::__private::Ok(
+                                __Field::__field3,
                             )
                         }
                         _ => _serde::__private::Ok(
@@ -1390,7 +1420,7 @@ const _: () = {
                                 return _serde::__private::Err(
                                     _serde::de::Error::invalid_length(
                                         0usize,
-                                        &"struct EmailClientSettings with 2 elements",
+                                        &"struct EmailClientSettings with 4 elements",
                                     ),
                                 );
                             }
@@ -1403,7 +1433,33 @@ const _: () = {
                                 return _serde::__private::Err(
                                     _serde::de::Error::invalid_length(
                                         1usize,
-                                        &"struct EmailClientSettings with 2 elements",
+                                        &"struct EmailClientSettings with 4 elements",
+                                    ),
+                                );
+                            }
+                        };
+                    let __field2 = match _serde::de::SeqAccess::next_element::<
+                            K1<P, str>,
+                        >(&mut __seq)? {
+                            _serde::__private::Some(__value) => __value,
+                            _serde::__private::None => {
+                                return _serde::__private::Err(
+                                    _serde::de::Error::invalid_length(
+                                        2usize,
+                                        &"struct EmailClientSettings with 4 elements",
+                                    ),
+                                );
+                            }
+                        };
+                    let __field3 = match _serde::de::SeqAccess::next_element::<
+                            u64,
+                        >(&mut __seq)? {
+                            _serde::__private::Some(__value) => __value,
+                            _serde::__private::None => {
+                                return _serde::__private::Err(
+                                    _serde::de::Error::invalid_length(
+                                        3usize,
+                                        &"struct EmailClientSettings with 4 elements",
                                     ),
                                 );
                             }
@@ -1412,6 +1468,8 @@ const _: () = {
                         EmailClientSettings {
                             base_url: __field0,
                             sender_email: __field1,
+                            authorization_token: __field2,
+                            timeout_milliseconds: __field3,
                         },
                     )
                 }
@@ -1425,6 +1483,8 @@ const _: () = {
                     {
                     let mut __field0: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
                     let mut __field1: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
+                    let mut __field2: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
+                    let mut __field3: _serde::__private::Option<u64> = _serde::__private::None;
                     while let _serde::__private::Some(
                         __key,
                     ) =
@@ -1459,6 +1519,30 @@ const _: () = {
                                         _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
                                     );
                             }
+                            __Field::__field2 => {
+                                if _serde::__private::Option::is_some(&__field2) {
+                                        return _serde::__private::Err(
+                                            <__A::Error as _serde::de::Error>::duplicate_field(
+                                                "authorization_token",
+                                            ),
+                                        );
+                                    }
+                                __field2 = _serde::__private::Some(
+                                        _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
+                                    );
+                            }
+                            __Field::__field3 => {
+                                if _serde::__private::Option::is_some(&__field3) {
+                                        return _serde::__private::Err(
+                                            <__A::Error as _serde::de::Error>::duplicate_field(
+                                                "timeout_milliseconds",
+                                            ),
+                                        );
+                                    }
+                                __field3 = _serde::__private::Some(
+                                        _serde::de::MapAccess::next_value::<u64>(&mut __map)?,
+                                    );
+                            }
                             _ => {
                                 let _ = _serde::de::MapAccess::next_value::<
                                         _serde::de::IgnoredAny,
@@ -1478,17 +1562,37 @@ const _: () = {
                                 _serde::__private::de::missing_field("sender_email")?
                             }
                         };
+                    let __field2 = match __field2 {
+                            _serde::__private::Some(__field2) => __field2,
+                            _serde::__private::None => {
+                                _serde::__private::de::missing_field("authorization_token")?
+                            }
+                        };
+                    let __field3 = match __field3 {
+                            _serde::__private::Some(__field3) => __field3,
+                            _serde::__private::None => {
+                                _serde::__private::de::missing_field(
+                                    "timeout_milliseconds",
+                                )?
+                            }
+                        };
                     _serde::__private::Ok(
                         EmailClientSettings {
                             base_url: __field0,
                             sender_email: __field1,
+                            authorization_token: __field2,
+                            timeout_milliseconds: __field3,
                         },
                     )
                 }
             }
             #[doc(hidden)]
-            const FIELDS: &'static [&'static str] =
-                &["base_url", "sender_email"];
+            const FIELDS: &'static [&'static str] = &[
+                "base_url",
+                "sender_email",
+                "authorization_token",
+                "timeout_milliseconds",
+            ];
             _serde::Deserializer::deserialize_struct(
                 __deserializer,
                 "EmailClientSettings",
@@ -1504,6 +1608,7 @@ const _: () = {
         }
     }
 };
+
 // Old impl with validation error collection (but Clone is required)
 // impl<'de, P: RefHKT> serde::Deserialize<'de>
 //     for EmailClientSettings<P>

@@ -44,7 +44,7 @@ impl<P: RefHKT> Deref for SubscriberEmail<P> {
 
 impl<P: SharedPointerHKT> Clone for SubscriberEmail<P> {
     fn clone(&self) -> Self {
-        Self(P::clone(&self.0.inner_ref()))
+        Self(P::clone(self.0.inner_ref()))
     }
 }
 
