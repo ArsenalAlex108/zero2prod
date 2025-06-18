@@ -14,7 +14,7 @@ use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
     hkt::{
-        BoxHKT, HKT1Unsized, K1, RcHKT, RefHKT,
+        RcHKT, RefHKT,
         SharedPointerHKT,
     },
     routes::{health_check, subscribe},

@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use crate::common;
 
 //`actix_rt::test`isthetestingequivalentof`actix_web::main`.
@@ -14,7 +16,7 @@ async fn health_check_works() {
     //Act
     let response = client
         .get(
-            common::spawn_app().await.address
+            common::spawn_app().await.address.deref().to_string()
                 + "/health_check",
         )
         .send()

@@ -1,27 +1,40 @@
-use kust::ScopeFunctions;
 use once_cell::sync::Lazy;
 use reqwest::Client;
-use sqlx::{
-    Connection, Executor, PgConnection, PgPool, database,
-};
-use std::net::TcpListener;
-use std::ops::Deref;
+use sqlx::{Connection, Executor, PgConnection, PgPool};
+use std::{borrow::Cow, ops::Deref};
 use uuid::Uuid;
 use zero2prod::{
     configuration::{
-        self, ApplicationSettings, DatabaseSettings,
-        Settings, get_configuration,
+        DatabaseSettings, Settings, get_configuration,
     },
-    domain::SubscriberEmail,
-    email_client::EmailClient,
-    hkt::{ArcHKT, BoxHKT, K1, RefHKT, SharedPointerHKT},
+    hkt::{ArcHKT, RefHKT, SharedPointerHKT},
     startup::{self, Application},
     utils::Pipe,
 };
 
-pub struct TestApp {
-    pub address: String,
+pub struct TestApp<'a> {
+    pub address: Cow<'a, str>,
     pub db_pool: PgPool,
+}
+
+impl TestApp<'_> {
+    pub async fn post_subscriptions(
+        &self,
+        body: impl Into<reqwest::Body>,
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        reqwest::Client::new()
+            .post(format!(
+                "{}/subscriptions",
+                &self.address
+            ))
+            .header(
+                "Content-Type",
+                "application/x-www-form-urlencoded",
+            )
+            .body(body)
+            .send()
+            .await
+    }
 }
 
 pub const TEST: &str = "test";
@@ -51,12 +64,12 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 
 /// Spinup an instance of our application
 /// and returns its address(i.e.http://localhost:XXXX)
-pub async fn spawn_app() -> TestApp {
+pub async fn spawn_app<'a>() -> TestApp<'a> {
     spawn_app_generic::<ArcHKT>().await
 }
 
-pub async fn spawn_app_generic<P: SharedPointerHKT>()
--> TestApp
+pub async fn spawn_app_generic<'a, P: SharedPointerHKT>()
+-> TestApp<'a>
 where
     P::T<str>: Send + Sync,
     P::T<Client>: Send + Sync,
@@ -107,7 +120,7 @@ where
         .pipe(tokio::spawn);
 
     TestApp {
-        address,
+        address: address.into(),
         db_pool: startup::get_connection_pool(
             &configuration.database,
         ),

@@ -1,13 +1,8 @@
-use std::net::TcpListener;
 
-use kust::ScopeFunctions;
 use reqwest::Client;
-use sqlx::postgres::PgPoolOptions;
 use zero2prod::{
     configuration::get_configuration,
-    domain::SubscriberEmail,
-    email_client::{self, EmailClient},
-    hkt::{ArcHKT, BoxHKT, RefHKT, SharedPointerHKT},
+    hkt::{ArcHKT, RefHKT, SharedPointerHKT},
     startup::Application,
     telemetry::{get_subscriber, init_subscriber},
 };
