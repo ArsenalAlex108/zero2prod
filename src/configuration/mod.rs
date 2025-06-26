@@ -54,10 +54,10 @@ impl<P: SharedPointerHKT> Clone for DatabaseSettings<P> {
         Self {
             username: self.username.clone(),
             password: self.password.clone(),
-            port: self.port.clone(),
+            port: self.port,
             host: self.host.clone(),
             database_name: self.database_name.clone(),
-            require_ssl: self.require_ssl.clone(),
+            require_ssl: self.require_ssl,
         }
     }
 }
@@ -69,6 +69,7 @@ pub struct ApplicationSettings<P: HKT1Unsized> {
     // )]
     pub port: u16,
     pub host: K1<P, str>,
+    pub base_url: K1<P, str>,
 }
 
 impl<P: SharedPointerHKT> Clone for ApplicationSettings<P> {
@@ -76,6 +77,7 @@ impl<P: SharedPointerHKT> Clone for ApplicationSettings<P> {
         Self {
             port: self.port,
             host: self.host.clone(),
+            base_url: self.base_url.clone(),
         }
     }
 }

@@ -1,9 +1,8 @@
-
 use reqwest::Client;
 use zero2prod::{
     configuration::get_configuration,
     hkt::{ArcHKT, RefHKT, SharedPointerHKT},
-    startup::Application,
+    startup::{self, Application},
     telemetry::{get_subscriber, init_subscriber},
 };
 
@@ -11,7 +10,7 @@ pub const INFO: &str = "info";
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    main_generic::<ArcHKT>().await
+    main_generic::<startup::GlobalSharedPointerType>().await
 }
 
 async fn main_generic<P: SharedPointerHKT>()

@@ -72,6 +72,12 @@ pub trait RefHKT: HKT1Unsized {
     fn from_string(v: String) -> K1<Self, str> {
         Self::from_box(Box::<str>::from(v))
     }
+    fn from_str(v: &str) -> K1<Self, str> {
+        Self::from_box(Box::<str>::from(v))
+    }
+    fn from_static_str(v: &'static str) -> K1<Self, str> {
+        Self::from_box(Box::<str>::from(v))
+    }
     fn from_vec<T>(v: Vec<T>) -> K1<Self, [T]> {
         Self::from_box(Box::<[T]>::from(v))
     }

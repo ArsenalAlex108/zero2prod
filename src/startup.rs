@@ -1,4 +1,4 @@
-use std::net::TcpListener;
+use std::{borrow::Cow, net::TcpListener, ops::Deref};
 
 use actix_web::{
     App, HttpServer,
@@ -14,30 +14,44 @@ use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
     hkt::{
-        RcHKT, RefHKT,
+        ArcHKT, HKT1Unsized, K1, RcHKT, RefHKT,
         SharedPointerHKT,
     },
-    routes::{health_check, subscribe},
+    routes::{
+        confirm_subscription_token, health_check, subscribe,
+    },
+    utils::Pipe,
 };
 
-type DefaultSharedPointerHKT = RcHKT;
+pub type GlobalSharedPointerType = ArcHKT;
 
 pub struct Application {
     port: u16,
     server: Server,
 }
 
+pub struct ApplicationBaseUrl<P: HKT1Unsized>(
+    pub K1<P, str>,
+);
+
 pub fn run<P: RefHKT>(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient<P>,
+    // Cow<'_, str> can be alternative using into_owned() (clone at most once).
+    // But String is more honest at that point
+    // Arc-like can be shared accross threads without cloning at the cost of intial memory allocation.
+    base_url: K1<P, str>,
 ) -> std::io::Result<Server>
 where
     P::T<Client>: Send + Sync,
     P::T<str>: Send + Sync,
 {
-    let db_pool = db_pool.using(web::Data::new);
-    let email_client = email_client.using(web::Data::new);
+    let db_pool = db_pool.pipe(web::Data::new);
+    let email_client = email_client.pipe(web::Data::new);
+    let base_url = base_url
+        .pipe(ApplicationBaseUrl)
+        .pipe(web::Data::new);
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger::default())
@@ -49,12 +63,13 @@ where
                 "/subscriptions",
                 web::post().to(subscribe),
             )
-            // .route(
-            //     "/subscriptions/confirm",
-            //     web::get().to(confirm_subscription_token::<DefaultSharedPointerHKT>)
-            // )
+            .route(
+                "/subscriptions/confirm",
+                web::get().to(confirm_subscription_token),
+            )
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
+            .app_data(base_url.clone())
     })
     .listen(listener)?
     .run();
@@ -94,8 +109,13 @@ impl Application {
         let listener = TcpListener::bind(&address)?;
         let port = listener.local_addr().unwrap().port();
 
-        run::<P>(listener, connection_pool, email_client)
-            .map(|server| Application { port, server })
+        run::<P>(
+            listener,
+            connection_pool,
+            email_client,
+            configuration.application.base_url.clone(),
+        )
+        .map(|server| Application { port, server })
     }
 
     pub fn port(&self) -> u16 {

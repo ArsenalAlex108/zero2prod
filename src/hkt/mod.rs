@@ -1,5 +1,6 @@
 mod archery_adapt;
 mod associative;
+pub mod traversable;
 mod validation;
 
 pub use archery_adapt::{

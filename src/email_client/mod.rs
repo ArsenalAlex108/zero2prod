@@ -1,9 +1,7 @@
 use std::ops::Deref;
 
 use crate::domain::SubscriberEmail;
-use crate::hkt::{
-    K1, RefHKT, SharedPointerHKT,
-};
+use crate::hkt::{K1, RefHKT, SharedPointerHKT};
 use kust::ScopeFunctions;
 use reqwest::Client;
 
@@ -102,13 +100,11 @@ mod tests {
     use crate::email_client::{
         EmailClient, X_POSTMARK_SERVER_TOKEN_HEADER,
     };
-    use crate::hkt::{
-        K1, RcHKT, RefHKT, SharedPointerHKT,
-    };
+    use crate::hkt::{K1, RcHKT, RefHKT, SharedPointerHKT};
     use crate::utils::Pipe;
+    use fake::Fake;
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
-    use fake::Fake;
     use uuid::Uuid;
     use wiremock::matchers::{
         any, header, header_exists, method, path,

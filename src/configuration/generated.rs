@@ -37,7 +37,7 @@ const _: () = {
             #[doc(hidden)]
             struct __FieldVisitor;
             #[automatically_derived]
-            impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
+            impl _serde::de::Visitor<'_> for __FieldVisitor {
                 type Value = __Field;
                 fn expecting(
                     &self,
@@ -321,7 +321,7 @@ const _: () = {
                 }
             }
             #[doc(hidden)]
-            const FIELDS: &'static [&'static str] = &[
+            const FIELDS: &[&str] = &[
                 "database",
                 "application",
                 "email_client",
@@ -370,12 +370,13 @@ const _: () = {
             enum __Field {
                 __field0,
                 __field1,
+                __field2,
                 __ignore,
             }
             #[doc(hidden)]
             struct __FieldVisitor;
             #[automatically_derived]
-            impl _serde::de::Visitor<'_> for __FieldVisitor {
+            impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
                 type Value = __Field;
                 fn expecting(
                     &self,
@@ -401,6 +402,9 @@ const _: () = {
                         1u64 => _serde::__private::Ok(
                             __Field::__field1,
                         ),
+                        2u64 => _serde::__private::Ok(
+                            __Field::__field2,
+                        ),
                         _ => _serde::__private::Ok(
                             __Field::__ignore,
                         ),
@@ -420,6 +424,11 @@ const _: () = {
                         "host" => _serde::__private::Ok(
                             __Field::__field1,
                         ),
+                        "base_url" => {
+                            _serde::__private::Ok(
+                                __Field::__field2,
+                            )
+                        }
                         _ => _serde::__private::Ok(
                             __Field::__ignore,
                         ),
@@ -439,6 +448,11 @@ const _: () = {
                         b"host" => _serde::__private::Ok(
                             __Field::__field1,
                         ),
+                        b"base_url" => {
+                            _serde::__private::Ok(
+                                __Field::__field2,
+                            )
+                        }
                         _ => _serde::__private::Ok(
                             __Field::__ignore,
                         ),
@@ -491,54 +505,19 @@ const _: () = {
                     where
                         __A: _serde::de::SeqAccess<'de>,
                     {
-                    #[allow(clippy::blocks_in_conditions)]
-                    let __field0 = match {
-                        #[doc(hidden)]
-                        struct __DeserializeWith<'de, P: RefHKT>
-                            {
-                                value: u16,
-                                phantom: _serde::__private::PhantomData<
-                                    ApplicationSettings<P>,
-                                >,
-                                lifetime: _serde::__private::PhantomData<&'de ()>,
-                            }
-                        #[automatically_derived]
-                        impl<'de, P: RefHKT>
-                            _serde::Deserialize<'de>
-                            for __DeserializeWith<'de, P>
-                        {
-                            fn deserialize<__D>(
-                                    __deserializer: __D,
-                                ) -> _serde::__private::Result<Self, __D::Error>
-                                where
-                                    __D: _serde::Deserializer<'de>,
-                                {
-                                _serde::__private::Ok(__DeserializeWith {
-                                        value: deserialize_number_from_string(__deserializer)?,
-                                        phantom: _serde::__private::PhantomData,
-                                        lifetime: _serde::__private::PhantomData,
-                                    })
-                            }
-                        }
-                        _serde::__private::Option::map(
-                                _serde::de::SeqAccess::next_element::<
-                                    __DeserializeWith<'de, P>,
-                                >(&mut __seq)?,
-                                |__wrap| __wrap.value,
-                            )
-                    } {
-                        _serde::__private::Some(
-                            __value,
-                        ) => __value,
-                        _serde::__private::None => {
-                            return _serde::__private::Err(
+                    let __field0 = match _serde::de::SeqAccess::next_element::<
+                            u16,
+                        >(&mut __seq)? {
+                            _serde::__private::Some(__value) => __value,
+                            _serde::__private::None => {
+                                return _serde::__private::Err(
                                     _serde::de::Error::invalid_length(
                                         0usize,
-                                        &"struct ApplicationSettings with 2 elements",
+                                        &"struct ApplicationSettings with 3 elements",
                                     ),
                                 );
-                        }
-                    };
+                            }
+                        };
                     let __field1 = match _serde::de::SeqAccess::next_element::<
                             K1<P, str>,
                         >(&mut __seq)? {
@@ -547,7 +526,20 @@ const _: () = {
                                 return _serde::__private::Err(
                                     _serde::de::Error::invalid_length(
                                         1usize,
-                                        &"struct ApplicationSettings with 2 elements",
+                                        &"struct ApplicationSettings with 3 elements",
+                                    ),
+                                );
+                            }
+                        };
+                    let __field2 = match _serde::de::SeqAccess::next_element::<
+                            K1<P, str>,
+                        >(&mut __seq)? {
+                            _serde::__private::Some(__value) => __value,
+                            _serde::__private::None => {
+                                return _serde::__private::Err(
+                                    _serde::de::Error::invalid_length(
+                                        2usize,
+                                        &"struct ApplicationSettings with 3 elements",
                                     ),
                                 );
                             }
@@ -556,6 +548,7 @@ const _: () = {
                         ApplicationSettings {
                             port: __field0,
                             host: __field1,
+                            base_url: __field2,
                         },
                     )
                 }
@@ -569,6 +562,7 @@ const _: () = {
                     {
                     let mut __field0: _serde::__private::Option<u16> = _serde::__private::None;
                     let mut __field1: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
+                    let mut __field2: _serde::__private::Option<K1<P, str>> = _serde::__private::None;
                     while let _serde::__private::Some(
                         __key,
                     ) =
@@ -585,44 +579,8 @@ const _: () = {
                                             <__A::Error as _serde::de::Error>::duplicate_field("port"),
                                         );
                                     }
-                                __field0 =
-                                    _serde::__private::Some(
-                                        {
-                                            #[doc(hidden)]
-                                            struct __DeserializeWith<'de, P: RefHKT>
-                                        {
-                                            value: u16,
-                                            phantom: _serde::__private::PhantomData<
-                                                ApplicationSettings<P>,
-                                            >,
-                                            lifetime: _serde::__private::PhantomData<&'de ()>,
-                                        }
-                                            #[automatically_derived]
-                                            impl<'de, P: RefHKT> _serde::Deserialize<'de>
-                                        for __DeserializeWith<'de, P>
-                                        {
-                                            fn deserialize<__D>(
-                                                __deserializer: __D,
-                                            ) -> _serde::__private::Result<Self, __D::Error>
-                                            where
-                                                __D: _serde::Deserializer<'de>,
-                                            {
-                                                _serde::__private::Ok(__DeserializeWith {
-                                                    value: deserialize_number_from_string(__deserializer)?,
-                                                    phantom: _serde::__private::PhantomData,
-                                                    lifetime: _serde::__private::PhantomData,
-                                                })
-                                            }
-                                        }
-                                            match _serde::de::MapAccess::next_value::<
-                                            __DeserializeWith<'de, P>,
-                                        >(&mut __map) {
-                                            _serde::__private::Ok(__wrapper) => __wrapper.value,
-                                            _serde::__private::Err(__err) => {
-                                                return _serde::__private::Err(__err);
-                                            }
-                                        }
-                                        },
+                                __field0 = _serde::__private::Some(
+                                        _serde::de::MapAccess::next_value::<u16>(&mut __map)?,
                                     );
                             }
                             __Field::__field1 => {
@@ -635,6 +593,18 @@ const _: () = {
                                         _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
                                     );
                             }
+                            __Field::__field2 => {
+                                if _serde::__private::Option::is_some(&__field2) {
+                                        return _serde::__private::Err(
+                                            <__A::Error as _serde::de::Error>::duplicate_field(
+                                                "base_url",
+                                            ),
+                                        );
+                                    }
+                                __field2 = _serde::__private::Some(
+                                        _serde::de::MapAccess::next_value::<K1<P, str>>(&mut __map)?,
+                                    );
+                            }
                             _ => {
                                 let _ = _serde::de::MapAccess::next_value::<
                                         _serde::de::IgnoredAny,
@@ -643,32 +613,35 @@ const _: () = {
                         }
                     }
                     let __field0 = match __field0 {
-                        _serde::__private::Some(
-                            __field0,
-                        ) => __field0,
-                        _serde::__private::None => {
-                            return _serde::__private::Err(
-                                    <__A::Error as _serde::de::Error>::missing_field("port"),
-                                );
-                        }
-                    };
+                            _serde::__private::Some(__field0) => __field0,
+                            _serde::__private::None => {
+                                _serde::__private::de::missing_field("port")?
+                            }
+                        };
                     let __field1 = match __field1 {
                             _serde::__private::Some(__field1) => __field1,
                             _serde::__private::None => {
                                 _serde::__private::de::missing_field("host")?
                             }
                         };
+                    let __field2 = match __field2 {
+                            _serde::__private::Some(__field2) => __field2,
+                            _serde::__private::None => {
+                                _serde::__private::de::missing_field("base_url")?
+                            }
+                        };
                     _serde::__private::Ok(
                         ApplicationSettings {
                             port: __field0,
                             host: __field1,
+                            base_url: __field2,
                         },
                     )
                 }
             }
             #[doc(hidden)]
             const FIELDS: &'static [&'static str] =
-                &["port", "host"];
+                &["port", "host", "base_url"];
             _serde::Deserializer::deserialize_struct(
                 __deserializer,
                 "ApplicationSettings",
@@ -684,7 +657,6 @@ const _: () = {
         }
     }
 };
-
 #[doc(hidden)]
 #[allow(
     non_upper_case_globals,
@@ -722,7 +694,7 @@ const _: () = {
             #[doc(hidden)]
             struct __FieldVisitor;
             #[automatically_derived]
-            impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
+            impl _serde::de::Visitor<'_> for __FieldVisitor {
                 type Value = __Field;
                 fn expecting(
                     &self,
@@ -1203,7 +1175,7 @@ const _: () = {
                 }
             }
             #[doc(hidden)]
-            const FIELDS: &'static [&'static str] = &[
+            const FIELDS: &[&str] = &[
                 "username",
                 "password",
                 "port",
@@ -1262,7 +1234,7 @@ const _: () = {
             #[doc(hidden)]
             struct __FieldVisitor;
             #[automatically_derived]
-            impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
+            impl _serde::de::Visitor<'_> for __FieldVisitor {
                 type Value = __Field;
                 fn expecting(
                     &self,
@@ -1587,7 +1559,7 @@ const _: () = {
                 }
             }
             #[doc(hidden)]
-            const FIELDS: &'static [&'static str] = &[
+            const FIELDS: &[&str] = &[
                 "base_url",
                 "sender_email",
                 "authorization_token",

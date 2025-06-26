@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use reqwest::Client;
+use reqwest::{Client, Url};
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::{borrow::Cow, ops::Deref};
 use uuid::Uuid;
@@ -7,15 +7,21 @@ use zero2prod::{
     configuration::{
         DatabaseSettings, Settings, get_configuration,
     },
-    hkt::{ArcHKT, RefHKT, SharedPointerHKT},
+    hkt::{RefHKT, SharedPointerHKT},
     startup::{self, Application},
     utils::Pipe,
 };
 
+use anyhow::{Context, anyhow};
+
 pub struct TestApp<'a> {
     pub address: Cow<'a, str>,
     pub db_pool: PgPool,
+    pub email_server: wiremock::MockServer,
+    pub port: u16,
 }
+
+pub mod email_server;
 
 impl TestApp<'_> {
     pub async fn post_subscriptions(
@@ -34,6 +40,40 @@ impl TestApp<'_> {
             .body(body)
             .send()
             .await
+    }
+
+    pub fn get_confirmation_links<'a>(
+        &self,
+        email_request: &wiremock::Request,
+    ) -> anyhow::Result<ConfirmationLinks<'a>> {
+        let body: serde_json::Value =
+            email_request.body[..]
+                .ref_cast()
+                .pipe(serde_json::from_slice)?;
+
+        fn url_parse<'a>(
+            body: &serde_json::Value,
+            field_name: &str,
+        ) -> anyhow::Result<Cow<'a, reqwest::Url>> {
+            get_link(body[field_name].as_str().ok_or_else(
+                || {
+                    anyhow!(format!(
+                        "{} parse failed.",
+                        field_name
+                    ))
+                },
+            )?)
+            .as_str()
+            .pipe(Url::parse)?
+            .pipe(Cow::<'_, reqwest::Url>::Owned)
+            .pipe(Ok)
+        }
+
+        ConfirmationLinks {
+            plain_text: url_parse(&body, "TextBody")?,
+            html: url_parse(&body, "HtmlBody")?,
+        }
+        .pipe(Ok)
     }
 }
 
@@ -65,7 +105,8 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 /// Spinup an instance of our application
 /// and returns its address(i.e.http://localhost:XXXX)
 pub async fn spawn_app<'a>() -> TestApp<'a> {
-    spawn_app_generic::<ArcHKT>().await
+    spawn_app_generic::<startup::GlobalSharedPointerType>()
+        .await
 }
 
 pub async fn spawn_app_generic<'a, P: SharedPointerHKT>()
@@ -78,6 +119,8 @@ where
 
     let configuration = get_configuration::<P>()
         .expect("Failed to read configuration");
+
+    let email_server = wiremock::MockServer::start().await;
 
     // Least efficient (2 copies!)
     let database = configuration
@@ -100,11 +143,19 @@ where
         application.pipe(P::new)
     };
 
+    let email_client = {
+        let mut email_client =
+            configuration.email_client.deref().clone();
+        email_client.base_url =
+            email_server.uri().pipe(P::from_string);
+        email_client.pipe(P::new)
+    };
+
     // Most efficient (with no mutations)
     let configuration = Settings {
         database,
         application,
-        email_client: configuration.email_client,
+        email_client,
     };
 
     configure_database(&configuration.database).await;
@@ -115,6 +166,8 @@ where
     let address =
         format!("http://127.0.0.1:{}", application.port());
 
+    let port = application.port();
+
     application
         .pipe(Application::run_until_stopped)
         .pipe(tokio::spawn);
@@ -124,6 +177,8 @@ where
         db_pool: startup::get_connection_pool(
             &configuration.database,
         ),
+        email_server,
+        port,
     }
 }
 
@@ -156,4 +211,17 @@ pub async fn configure_database<P: RefHKT>(
         .await
         .expect("Failed to migrate the database");
     connection_pool
+}
+
+pub struct ConfirmationLinks<'a> {
+    pub html: Cow<'a, reqwest::Url>,
+    pub plain_text: Cow<'a, reqwest::Url>,
+}
+pub fn get_link(s: &str) -> String {
+    let links: Vec<_> = linkify::LinkFinder::new()
+        .links(s)
+        .filter(|l| *l.kind() == linkify::LinkKind::Url)
+        .collect();
+    assert_eq!(links.len(), 1);
+    links[0].as_str().to_owned()
 }
