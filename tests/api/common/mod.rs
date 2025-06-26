@@ -12,7 +12,7 @@ use zero2prod::{
     utils::Pipe,
 };
 
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 
 pub struct TestApp<'a> {
     pub address: Cow<'a, str>,

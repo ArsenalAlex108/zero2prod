@@ -376,7 +376,7 @@ const _: () = {
             #[doc(hidden)]
             struct __FieldVisitor;
             #[automatically_derived]
-            impl<'de> _serde::de::Visitor<'de> for __FieldVisitor {
+            impl _serde::de::Visitor<'_> for __FieldVisitor {
                 type Value = __Field;
                 fn expecting(
                     &self,
@@ -640,7 +640,7 @@ const _: () = {
                 }
             }
             #[doc(hidden)]
-            const FIELDS: &'static [&'static str] =
+            const FIELDS: &[&str] =
                 &["port", "host", "base_url"];
             _serde::Deserializer::deserialize_struct(
                 __deserializer,

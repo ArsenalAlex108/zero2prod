@@ -1,11 +1,10 @@
-use std::{borrow::Cow, net::TcpListener, ops::Deref};
+use std::net::TcpListener;
 
 use actix_web::{
     App, HttpServer,
     dev::Server,
     web::{self},
 };
-use kust::ScopeFunctions;
 use reqwest::Client;
 use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
@@ -14,7 +13,7 @@ use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
     hkt::{
-        ArcHKT, HKT1Unsized, K1, RcHKT, RefHKT,
+        ArcHKT, HKT1Unsized, K1, RefHKT,
         SharedPointerHKT,
     },
     routes::{

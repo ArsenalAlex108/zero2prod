@@ -1,7 +1,7 @@
 use reqwest::Client;
 use zero2prod::{
     configuration::get_configuration,
-    hkt::{ArcHKT, RefHKT, SharedPointerHKT},
+    hkt::SharedPointerHKT,
     startup::{self, Application},
     telemetry::{get_subscriber, init_subscriber},
 };

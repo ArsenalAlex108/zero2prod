@@ -1,8 +1,6 @@
-use reqwest::Client;
-use uuid::Uuid;
 
 use crate::common::{
-    self, TestApp, email_server, get_link, spawn_app,
+    self, email_server, spawn_app,
 };
 
 #[actix_rt::test]
@@ -43,7 +41,7 @@ async fn subscribe_persists_new_user() {
         .await;
 
     // Act
-    let response = app
+    let _ = app
         .post_subscriptions(body)
         .await
         .expect("Failed to execute request.");

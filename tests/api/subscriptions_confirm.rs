@@ -2,7 +2,7 @@ use uuid::Uuid;
 use zero2prod::utils::Pipe;
 
 use crate::common::{
-    self, TestApp, email_server, get_link,
+    self, TestApp, email_server,
 };
 
 #[actix_rt::test]
