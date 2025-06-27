@@ -1,9 +1,7 @@
 use uuid::Uuid;
 use zero2prod::utils::Pipe;
 
-use crate::common::{
-    self, TestApp, email_server,
-};
+use crate::common::{self, TestApp, email_server};
 
 #[actix_rt::test]
 async fn confirm_without_subscription_token_returns_400() {

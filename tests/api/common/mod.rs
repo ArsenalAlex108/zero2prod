@@ -42,6 +42,21 @@ impl TestApp<'_> {
             .await
     }
 
+    pub async fn post_newsletter(
+        &self,
+        body: &serde_json::Value,
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        reqwest::Client::new()
+            .post(format!(
+                "{}/newsletters",
+                self.address.as_ref()
+            ))
+            .json(body)
+            .header("Content-Type", "application/json")
+            .send()
+            .await
+    }
+
     pub fn get_confirmation_links<'a>(
         &self,
         email_request: &wiremock::Request,

@@ -1,7 +1,4 @@
-
-use crate::common::{
-    self, email_server, spawn_app,
-};
+use crate::common::{self, email_server, spawn_app};
 
 #[actix_rt::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {

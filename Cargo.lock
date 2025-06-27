@@ -1464,6 +1464,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4345964bb142484797b161f473a503a434de77149dd8c7427788c6e13379388"
 
 [[package]]
+name = "lazy_errors"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "38563710a0241a6df6b8bdd2319094df44181e93133e78c669c57f3052845baf"
+dependencies = [
+ "eyre",
+]
+
+[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3736,6 +3745,7 @@ dependencies = [
  "fake",
  "futures",
  "kust",
+ "lazy_errors",
  "linkify",
  "naan",
  "nameof",

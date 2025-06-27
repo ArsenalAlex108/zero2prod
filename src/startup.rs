@@ -13,11 +13,11 @@ use crate::{
     configuration::{DatabaseSettings, Settings},
     email_client::EmailClient,
     hkt::{
-        ArcHKT, HKT1Unsized, K1, RefHKT,
-        SharedPointerHKT,
+        ArcHKT, HKT1Unsized, K1, RefHKT, SharedPointerHKT,
     },
     routes::{
-        confirm_subscription_token, health_check, subscribe,
+        confirm_subscription_token, health_check,
+        publish_newsletter, subscribe,
     },
     utils::Pipe,
 };
@@ -65,6 +65,10 @@ where
             .route(
                 "/subscriptions/confirm",
                 web::get().to(confirm_subscription_token),
+            )
+            .route(
+                "/newsletters",
+                web::post().to(publish_newsletter),
             )
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
