@@ -64,10 +64,7 @@ where
     P::T<str>: Send + Sync,
     P::T<reqwest::Client>: Send + Sync,
 {
-    let addresses = sqlx::query!("--sql
-    SELECT email FROM subscriptions 
-    WHERE status = 'confirmed'")
-    .fetch_all(pool.as_ref())
+    let addresses = get_confirmed_subscribers_emails_raw(&pool)
     .await
     .context("Failed to query for confirmed subscribers from database.")
     .map_err(lazy_errors::Error::wrap)?;
@@ -85,9 +82,10 @@ where
             || "One or more Errors occurred trying to sent newsletter to confirmed subscribers.",
         );
 
+    // Does this chain need refactoring into a seperate method?
     addresses.into_iter()
     .filter_map(|i| {
-        SubscriberEmail::try_from(i.email.clone())
+        SubscriberEmail::try_from(i.email.as_ref().to_string())
         .inspect_err(|e| tracing::warn!("Found subscriber with invalid email while attempting to send a newsletter to them: '{0}'\n
         Error: '{e}'", i.email))
         .ok()
@@ -116,4 +114,26 @@ where
         .into_result()
         .map(|_| HttpResponse::Ok().finish())?
         .pipe(Ok)
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct SubscriberEmailRaw<'a> {
+    pub email: Cow<'a, str>,
+}
+
+#[tracing::instrument(
+    name = "Get email address of confirmed subscribers without any validation.",
+    skip(pool)
+)]
+async fn get_confirmed_subscribers_emails_raw(
+    pool: &PgPool,
+) -> Result<Vec<SubscriberEmailRaw<'_>>, sqlx::Error> {
+    sqlx::query_as!(
+        SubscriberEmailRaw::<'_>,
+        "--sql
+    SELECT email FROM subscriptions 
+    WHERE status = 'confirmed'"
+    )
+    .fetch_all(pool)
+    .await
 }

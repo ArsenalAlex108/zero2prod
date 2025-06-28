@@ -1,7 +1,6 @@
 use std::{borrow::Cow, str::FromStr};
 
 use actix_web::{HttpResponse, http::StatusCode, web};
-use eyre::{Context, eyre};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -12,7 +11,7 @@ pub struct Parameters<'a> {
     subscription_token: Cow<'a, str>,
 }
 
-// TODO: Refactor database queryies into methods with bespoke error types.
+// Note: Status is usually only updated once for each subscriber, transactionalization is probably not needed.
 #[tracing::instrument(
     name = "Confirm pending subscriber",
     skip(parameters, pg_pool)
@@ -21,62 +20,35 @@ pub async fn confirm_subscription_token<'a>(
     parameters: web::Query<Parameters<'a>>,
     pg_pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ConfirmSubscriptionTokenError> {
-    parameters.subscription_token.ref_cast()
-    .as_ref()
-    .pipe(Uuid::from_str)
-    .map_err(|_| ConfirmSubscriptionTokenError::Unauthorized)
-    .map(async |subscription_token|
-        sqlx::query!(
-            "--sql
-            SELECT subscriber_id
-            FROM subscription_tokens
-            WHERE id = $1",
-            subscription_token
-        )
-        .fetch_one(pg_pool.as_ref())
-        .await
-        .map_err(|e| {
-            use ConfirmSubscriptionTokenError as E;
-            match e {
-                sqlx::Error::RowNotFound => E::Unauthorized,
-                e => eyre::Report::new(e)
-                .wrap_err("Subscription token query from the database failed.")
-                .pipe(E::from)
-            }
+    parameters
+        .subscription_token
+        .ref_cast()
+        .as_ref()
+        .pipe(Uuid::from_str)
+        .map_err(|_| {
+            ConfirmSubscriptionTokenError::Unauthorized
         })
-    )
-    .pipe(traversable::traverse_result_future_result)
-    .await
-    .map(|i| i.subscriber_id)
-    .map(async |subscriber_id| {
-        sqlx::query!(
-            "--sql
-            UPDATE subscriptions
-            SET status = 'confirmed'
-            WHERE id = $1",
-            &subscriber_id
-        )
-        .execute(pg_pool.as_ref())
-        .await
-        .context("Failed to update subscription status to confirmed in database.")
-        .map_err(ConfirmSubscriptionTokenError::from)
-    })
-    .pipe(traversable::traverse_result_future_result)
-    .await
-    .and_then(|i|
-        if i.rows_affected() == 1 {
-            HttpResponse::Ok().finish().pipe(Ok)
-        } else {
-            eyre!(
-                format!(
-                    "Abnormal number of rows affected: {}",
-                    i.rows_affected()
-                )
+        .map(async |subscription_token| {
+            get_subscriber_id_of_confirmation_token(
+                subscription_token,
+                &pg_pool,
             )
-            .pipe(ConfirmSubscriptionTokenError::from)
-            .pipe(Err)
-        }
-    )
+            .await
+            .map_err(ConfirmSubscriptionTokenError::from)
+        })
+        .pipe(traversable::traverse_result_future_result)
+        .await
+        .map(async |subscriber_id| {
+            update_status_of_subscriber_id_to_confirmed(
+                subscriber_id,
+                &pg_pool,
+            )
+            .await
+            .map_err(ConfirmSubscriptionTokenError::from)
+        })
+        .pipe(traversable::traverse_result_future_result)
+        .await
+        .map(|_| HttpResponse::Ok().finish())
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -85,6 +57,118 @@ pub enum ConfirmSubscriptionTokenError {
     Unauthorized,
     #[error("Unexpected: {0}")]
     Unexpected(#[from] eyre::Report),
+}
+
+impl From<GetSubscriberIdOfConfirmationTokenError>
+    for ConfirmSubscriptionTokenError
+{
+    fn from(
+        value: GetSubscriberIdOfConfirmationTokenError,
+    ) -> Self {
+        match value {
+            GetSubscriberIdOfConfirmationTokenError::TokenNotFound {
+                subscription_token: _
+            } => ConfirmSubscriptionTokenError::Unauthorized,
+            GetSubscriberIdOfConfirmationTokenError::Database(e) => e.pipe(eyre::Report::new)
+            // .wrap_err("Database error occurred during confirming subscription token process.")
+            .pipe(ConfirmSubscriptionTokenError::from)
+        }
+    }
+}
+
+#[tracing::instrument(
+    name = "Get Subscriber Id associated with a Subscription Confirmation Token.",
+    skip(subscription_token, pg_pool)
+)]
+async fn get_subscriber_id_of_confirmation_token(
+    subscription_token: Uuid,
+    pg_pool: &PgPool,
+) -> Result<Uuid, GetSubscriberIdOfConfirmationTokenError> {
+    sqlx::query!(
+        "--sql
+        SELECT subscriber_id
+        FROM subscription_tokens
+        WHERE id = $1",
+        &subscription_token
+    )
+    .fetch_one(pg_pool)
+    .await
+    .map(|i| i.subscriber_id)
+    .map_err(|e| {
+        use GetSubscriberIdOfConfirmationTokenError as E;
+        match e {
+            sqlx::Error::RowNotFound => {
+                E::TokenNotFound { subscription_token }
+            }
+            e => E::Database(e),
+        }
+    })
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum GetSubscriberIdOfConfirmationTokenError {
+    #[error("Subscription token not found.")]
+    TokenNotFound { subscription_token: Uuid },
+    #[error(
+        "Query for subscriber id of confirmation token failed."
+    )]
+    Database(#[from] sqlx::Error),
+}
+
+#[tracing::instrument(
+    name = "Updates confirmation status of a Subscriber of Id to 'confirmed'",
+    skip(subscriber_id, pg_pool)
+)]
+async fn update_status_of_subscriber_id_to_confirmed(
+    subscriber_id: Uuid,
+    pg_pool: &PgPool,
+) -> Result<(), UpdateConfirmationStatusOfSubscriberIdError>
+{
+    sqlx::query!(
+        "--sql
+        UPDATE subscriptions
+        SET status = 'confirmed'
+        WHERE id = $1",
+        &subscriber_id
+    )
+    .execute(pg_pool)
+    .await
+    .pipe(|i| {
+        use UpdateConfirmationStatusOfSubscriberIdError as E;
+        match i {
+            Ok(result) => {
+                let row_count = result.rows_affected();
+                if row_count == 1 { Ok(()) }
+                else { Err(E::AbnormalUpdatedRowCount(row_count as usize)) }
+            }
+            Err(e) => {
+                E::Database(e)
+                .pipe(Err)
+            }
+        }
+    })
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum UpdateConfirmationStatusOfSubscriberIdError {
+    #[error("Updated row count is not one: {0}")]
+    AbnormalUpdatedRowCount(usize),
+    #[error(
+        "Database error occured trying to update confirmation status of subscriber id."
+    )]
+    Database(#[from] sqlx::Error),
+}
+
+impl From<UpdateConfirmationStatusOfSubscriberIdError>
+    for ConfirmSubscriptionTokenError
+{
+    fn from(
+        value: UpdateConfirmationStatusOfSubscriberIdError,
+    ) -> Self {
+        value
+            .pipe(eyre::Report::new)
+            .pipe(ConfirmSubscriptionTokenError::from)
+    }
 }
 
 impl actix_web::ResponseError
