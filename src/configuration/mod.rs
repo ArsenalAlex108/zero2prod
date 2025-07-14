@@ -1,5 +1,7 @@
 use config::Config;
+use hmac::Hmac;
 use nameof::name_of;
+use secrecy::SecretString;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::ConnectOptions;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
@@ -18,6 +20,7 @@ pub mod generated;
 
 const APP_ENVIRONMENT: &str = name_of!(APP_ENVIRONMENT);
 
+// TODO: Add Redis URI.
 //#[derive(serde::Deserialize)]
 #[derive(derive_more::Constructor)]
 pub struct Settings<P: HKT1Unsized> {
@@ -62,6 +65,7 @@ impl<P: SharedPointerHKT> Clone for DatabaseSettings<P> {
     }
 }
 
+//#[derive(serde::Deserialize)]
 #[derive(derive_more::Constructor)]
 pub struct ApplicationSettings<P: HKT1Unsized> {
     // #[serde(
@@ -70,6 +74,7 @@ pub struct ApplicationSettings<P: HKT1Unsized> {
     pub port: u16,
     pub host: K1<P, str>,
     pub base_url: K1<P, str>,
+    pub hmac_secret: K1<P, HmacSecret<P>>,
 }
 
 impl<P: SharedPointerHKT> Clone for ApplicationSettings<P> {
@@ -78,6 +83,7 @@ impl<P: SharedPointerHKT> Clone for ApplicationSettings<P> {
             port: self.port,
             host: self.host.clone(),
             base_url: self.base_url.clone(),
+            hmac_secret: self.hmac_secret.clone(),
         }
     }
 }
@@ -118,6 +124,23 @@ impl<P: SharedPointerHKT> Clone for EmailClientSettings<P> {
                 .clone(),
             timeout_milliseconds: self.timeout_milliseconds,
         }
+    }
+}
+
+//#[derive(serde::Deserialize)]
+#[derive(
+    derive_more::Deref,
+    derive_more::AsRef,
+    derive_more::From,
+    derive_more::Into,
+)]
+pub struct HmacSecret<P: HKT1Unsized>(
+    pub K1<P, SecretString>,
+);
+
+impl<P: SharedPointerHKT> Clone for HmacSecret<P> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 

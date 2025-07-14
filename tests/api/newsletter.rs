@@ -1,11 +1,21 @@
-use zero2prod::utils::Pipe;
+use uuid::Uuid;
+use zero2prod::{
+    authentication::BasicAuthCredentials, utils::Pipe,
+};
 
-use crate::common::{self, TestApp, email_server};
+use crate::common::{
+    self, TestApp, assert_is_redirect_to,
+    create_test_newsletter_writer, email_server,
+    get_test_newsletter_writer,
+};
 
 #[actix_web::test]
-async fn newsletter_is_sent_to_confirmed_subscribers() {
+async fn newsletter_is_sent_to_confirmed_subscribers_and_redirects_to_self_with_success()
+ {
     // Spawn app V
     let app = common::spawn_app().await;
+
+    create_test_newsletter_writer(&app).await;
 
     // Create confirmed subscribers using public APIs and Mock V
     create_confirmed_subscribers(&app).await;
@@ -16,15 +26,15 @@ async fn newsletter_is_sent_to_confirmed_subscribers() {
         .mount(&app.email_server)
         .await;
 
+    app.post_login_with_default().await.unwrap();
+
     // Create newsletter V
     // A sketch of the newsletter payload structure.
     // We might change it later on.
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
-        "content": {
-        "text": "Newsletter body as plain text",
-        "html": "<p>Newsletter body as HTML</p>",
-        }
+        "content_text": "Newsletter body as plain text",
+        "content_html": "<p>Newsletter body as HTML</p>",
     });
 
     // Send using public API
@@ -33,7 +43,19 @@ async fn newsletter_is_sent_to_confirmed_subscribers() {
         .await
         .expect("Failed to send request.");
 
-    assert_eq!(response.status().as_u16(), 200);
+    assert_is_redirect_to(&response, "/admin/newsletters");
+
+    let text = app
+        .get_newsletter_form()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    assert!(
+        text.contains("Newsletter successfully posted")
+    );
 }
 
 #[actix_web::test]
@@ -41,6 +63,8 @@ async fn newsletter_is_not_sent_to_unconfirmed_subscribers()
 {
     // Spawn app V
     let app = common::spawn_app().await;
+
+    create_test_newsletter_writer(&app).await;
 
     // Create unconfirmed subscribers using public APIs and Mock V
     create_unconfirmed_subscribers(&app).await;
@@ -51,15 +75,15 @@ async fn newsletter_is_not_sent_to_unconfirmed_subscribers()
         .mount(&app.email_server)
         .await;
 
+    app.post_login_with_default().await.unwrap();
+
     // Create newsletter V
     // A sketch of the newsletter payload structure.
     // We might change it later on.
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
-        "content": {
-        "text": "Newsletter body as plain text",
-        "html": "<p>Newsletter body as HTML</p>",
-        }
+        "content_text": "Newsletter body as plain text",
+        "content_html": "<p>Newsletter body as HTML</p>",
     });
 
     // Send to Mock email client
@@ -68,14 +92,31 @@ async fn newsletter_is_not_sent_to_unconfirmed_subscribers()
         .await
         .expect("Failed to send request.");
 
-    assert_eq!(response.status().as_u16(), 200);
+    assert_is_redirect_to(&response, "/admin/newsletters");
+
+    let text = app
+        .get_newsletter_form()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    assert!(
+        text.contains("Newsletter successfully posted")
+    );
     // Confirm Mock email client received no requests
 }
 
+#[deprecated(
+    note = "No newsletter data validation specified and API is expected to serve human users."
+)]
 #[actix_web::test]
 async fn newsletter_returns_400_for_invalid_body() {
     // Spawn app V
     let app = common::spawn_app().await;
+
+    app.post_login_with_default().await.unwrap();
 
     // Create newsletter V
     // A sketch of the newsletter payload structure.
@@ -99,9 +140,12 @@ async fn newsletter_returns_400_for_invalid_body() {
 }
 
 #[actix_web::test]
-async fn newsletter_returns_500_for_fatal_database_error() {
+async fn newsletter_redirect_to_get_with_error_for_fatal_database_error()
+ {
     // Spawn app V
     let app = common::spawn_app().await;
+
+    app.post_login_with_default().await.unwrap();
 
     sqlx::query!(
         "--sql
@@ -112,14 +156,10 @@ async fn newsletter_returns_500_for_fatal_database_error() {
     .unwrap();
 
     // Create newsletter V
-    // A sketch of the newsletter payload structure.
-    // We might change it later on.
     let newsletter_request_body = serde_json::json!({
         "title": "Newsletter title",
-        "content": {
-        "text": "Newsletter body as plain text",
-        "html": "<p>Newsletter body as HTML</p>",
-        }
+        "content_text": "Newsletter body as plain text",
+        "content_html": "<p>Newsletter body as HTML</p>",
     });
 
     // Send using public API
@@ -128,7 +168,44 @@ async fn newsletter_returns_500_for_fatal_database_error() {
         .await
         .expect("Failed to send request.");
 
-    assert_eq!(response.status().as_u16(), 500, "todo");
+    assert_is_redirect_to(&response, "/admin/newsletters");
+
+    let text = app
+        .get_newsletter_form()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+
+    assert!(text.contains("One or more errors occurred trying to post the newsletter"));
+}
+
+#[actix_web::test]
+async fn post_unauthorized_access_redirects_to_login() {
+    let app = common::spawn_app().await;
+
+    create_test_newsletter_writer(&app).await;
+
+    email_server::get_mock_builder()
+        .respond_with(wiremock::ResponseTemplate::new(200))
+        .expect(0)
+        .mount(&app.email_server)
+        .await;
+
+    let newsletter_request_body = serde_json::json!({
+        "title": "Newsletter title",
+        "content_text": "Newsletter body as plain text",
+        "content_html": "<p>Newsletter body as HTML</p>",
+    });
+
+    // Send to Mock email client
+    let response = app
+        .post_newsletter(&newsletter_request_body)
+        .await
+        .expect("Failed to send request.");
+
+    assert_is_redirect_to(&response, "/login");
 }
 
 async fn create_confirmed_subscribers(app: &TestApp<'_>) {
@@ -147,6 +224,8 @@ async fn create_confirmed_subscribers(app: &TestApp<'_>) {
             i.set_port(app.port.pipe(Some)).unwrap();
             i
         });
+
+    dbg!(&confirmation_link);
 
     assert_eq!(
         confirmation_link.host_str().unwrap(),

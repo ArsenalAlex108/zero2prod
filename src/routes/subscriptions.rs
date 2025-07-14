@@ -184,7 +184,7 @@ pub async fn send_confirmation_email<
 }
 
 #[derive(Debug, thiserror::Error)]
-enum SubscribeError {
+pub enum SubscribeError {
     #[error("Parsing new subscriber failed: {0}")]
     Validation(#[from] NewSubscriberParseError),
     #[error("{0}")]

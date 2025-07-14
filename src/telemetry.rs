@@ -39,3 +39,13 @@ pub fn init_subscriber(
         stringify!(tracing::subscriber::set_global_default)
     ));
 }
+
+pub fn spawn_blocking_with_tracing<R: Send + 'static>(
+    f: impl FnOnce() -> R + Send + 'static,
+) -> tokio::task::JoinHandle<R> {
+    let current_span = tracing::Span::current();
+
+    tokio::task::spawn_blocking(move || {
+        current_span.in_scope(f)
+    })
+}

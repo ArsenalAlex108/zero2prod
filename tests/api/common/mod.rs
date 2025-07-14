@@ -1,15 +1,26 @@
+use actix_web::http::Uri;
+use core::str;
+use eyre::Context;
 use once_cell::sync::Lazy;
 use reqwest::{Client, Url};
+use secrecy::ExposeSecret;
+use secrecy::SecretString;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::{borrow::Cow, ops::Deref};
 use uuid::Uuid;
 use zero2prod::{
+    authentication::BasicAuthCredentials,
     configuration::{
         DatabaseSettings, Settings, get_configuration,
     },
     hkt::{RefHKT, SharedPointerHKT},
     startup::{self, Application},
     utils::Pipe,
+};
+
+use argon2::{
+    Argon2, PasswordHash, PasswordHasher,
+    password_hash::SaltString,
 };
 
 use anyhow::anyhow;
@@ -19,6 +30,7 @@ pub struct TestApp<'a> {
     pub db_pool: PgPool,
     pub email_server: wiremock::MockServer,
     pub port: u16,
+    pub http_client: reqwest::Client,
 }
 
 pub mod email_server;
@@ -28,7 +40,7 @@ impl TestApp<'_> {
         &self,
         body: impl Into<reqwest::Body>,
     ) -> Result<reqwest::Response, reqwest::Error> {
-        reqwest::Client::new()
+        self.http_client
             .post(format!(
                 "{}/subscriptions",
                 &self.address
@@ -44,15 +56,26 @@ impl TestApp<'_> {
 
     pub async fn post_newsletter(
         &self,
-        body: &serde_json::Value,
+        body: &impl serde::Serialize,
     ) -> Result<reqwest::Response, reqwest::Error> {
-        reqwest::Client::new()
+        self.http_client
             .post(format!(
-                "{}/newsletters",
+                "{}/admin/newsletters",
                 self.address.as_ref()
             ))
-            .json(body)
-            .header("Content-Type", "application/json")
+            .form(body)
+            .send()
+            .await
+    }
+
+    pub async fn get_newsletter_form(
+        &self,
+    ) -> Result<reqwest::Response, reqwest::Error> {
+        self.http_client
+            .get(format!(
+                "{}/admin/newsletters",
+                self.address.as_ref()
+            ))
             .send()
             .await
     }
@@ -89,6 +112,99 @@ impl TestApp<'_> {
             html: url_parse(&body, "HtmlBody")?,
         }
         .pipe(Ok)
+    }
+
+    pub async fn post_login<Body: serde::Serialize>(
+        &self,
+        body: &Body,
+    ) -> Result<reqwest::Response, eyre::Report> {
+        self.http_client
+            .post(format!("{}/login", &self.address))
+            .form(body)
+            .send()
+            .await
+            .context("Login HTTP Request should succeed.")
+    }
+
+    pub async fn post_login_with_default(
+        &self,
+    ) -> Result<reqwest::Response, eyre::Report> {
+        let test_user = get_test_newsletter_writer();
+
+        self.post_login(&serde_json::json!({
+            "username": test_user.username.as_ref(),
+            "password": test_user.raw_password.as_ref().expose_secret(),
+        })).await
+    }
+
+    pub async fn get_login_html(
+        &self,
+    ) -> Result<String, eyre::Report> {
+        self.http_client
+            .get(format!("{}/login", &self.address))
+            .send()
+            .await
+            .context("Login HTTP Request should succeed.")?
+            .text()
+            .await
+            .context("Failed to get response body as text.")
+    }
+
+    pub async fn get_admin_dashboard(
+        &self,
+    ) -> Result<reqwest::Response, eyre::Report> {
+        self.http_client
+        .get(format!("{}/admin/dashboard", &self.address))
+        .send()
+        .await
+        .context("Admin Dashboard HTTP Request should succeed.")
+    }
+
+    pub async fn get_admin_dashboard_html(
+        &self,
+    ) -> Result<String, eyre::Report> {
+        self.http_client
+        .get(format!("{}/admin/dashboard", &self.address))
+        .send()
+        .await
+        .context("Admin Dashboard HTTP Request should succeed.")?
+        .text()
+        .await
+        .context("Failed to get response body as text.")
+    }
+
+    pub async fn get_reset_password_form(
+        &self,
+    ) -> Result<reqwest::Response, eyre::Report> {
+        self.http_client
+        .get(format!("{}/admin/reset_password", &self.address))
+        .send()
+        .await
+        .context("Accessing admin reset password should always receive a response.")
+    }
+
+    pub async fn post_reset_password(
+        &self,
+        body: &impl serde::Serialize,
+    ) -> Result<reqwest::Response, eyre::Report> {
+        self.http_client
+        .post(format!("{}/admin/reset_password", &self.address))
+        .form(body)
+        .send()
+        .await
+        .context("Request password reset should always return response.")
+    }
+
+    pub async fn post_logout(
+        &self,
+    ) -> Result<reqwest::Response, eyre::Report> {
+        self.http_client
+            .post(format!("{}/admin/logout", &self.address))
+            .send()
+            .await
+            .context(
+                "Logout should always return response.",
+            )
     }
 }
 
@@ -129,6 +245,7 @@ pub async fn spawn_app_generic<'a, P: SharedPointerHKT>()
 where
     P::T<str>: Send + Sync,
     P::T<Client>: Send + Sync,
+    P::T<SecretString>: Send + Sync,
 {
     Lazy::force(&TRACING);
 
@@ -176,6 +293,7 @@ where
     configure_database(&configuration.database).await;
 
     let application = Application::build(&configuration)
+        .await
         .expect("Application should build successfully.");
     // Get the port before spawning the application
     let address =
@@ -187,6 +305,12 @@ where
         .pipe(Application::run_until_stopped)
         .pipe(tokio::spawn);
 
+    let http_client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .cookie_store(true)
+        .build()
+        .expect("reqwest ClientBuilder is valid.");
+
     TestApp {
         address: address.into(),
         db_pool: startup::get_connection_pool(
@@ -194,6 +318,7 @@ where
         ),
         email_server,
         port,
+        http_client,
     }
 }
 
@@ -239,4 +364,69 @@ pub fn get_link(s: &str) -> String {
         .collect();
     assert_eq!(links.len(), 1);
     links[0].as_str().to_owned()
+}
+
+pub fn get_test_newsletter_writer<'a>()
+-> BasicAuthCredentials<'a> {
+    BasicAuthCredentials {
+        username: "test_user".pipe(Cow::Borrowed),
+        raw_password: "supersecret"
+            .pipe(Box::<str>::from)
+            .pipe(SecretString::new)
+            .pipe(Cow::Owned),
+    }
+}
+
+pub async fn create_test_newsletter_writer(
+    app: &TestApp<'_>,
+) {
+    let test_newsletter_writer =
+        get_test_newsletter_writer();
+    let salt =
+        SaltString::generate(&mut rand::thread_rng());
+    let hash = hash_password(
+        &test_newsletter_writer.raw_password,
+        &salt,
+    );
+    let hash = hash.serialize();
+    let hash = hash.as_str();
+
+    let user_id = Uuid::new_v4();
+
+    sqlx::query!("--sql
+        INSERT INTO newsletter_writers (user_id, username, salted_password) 
+        VALUES ($1, $2, $3)",
+        user_id,
+        test_newsletter_writer.username.as_ref(),
+        hash,
+    )
+    .execute(&app.db_pool)
+    .await
+    .unwrap();
+}
+
+pub fn hash_password<'a>(
+    password: &SecretString,
+    salt: &'a SaltString,
+) -> PasswordHash<'a> {
+    let hasher = Argon2::default();
+    let hash = hasher
+        .hash_password(
+            password.expose_secret().as_bytes(),
+            salt,
+        )
+        .unwrap();
+
+    hash
+}
+
+pub fn assert_is_redirect_to(
+    response: &reqwest::Response,
+    uri_path: &str,
+) {
+    assert_eq!(response.status().as_u16(), 303);
+    assert_eq!(
+        response.headers().get("Location").unwrap(),
+        uri_path
+    );
 }

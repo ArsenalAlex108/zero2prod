@@ -16,8 +16,8 @@ pub struct Parameters<'a> {
     name = "Confirm pending subscriber",
     skip(parameters, pg_pool)
 )]
-pub async fn confirm_subscription_token<'a>(
-    parameters: web::Query<Parameters<'a>>,
+pub async fn confirm_subscription_token(
+    parameters: web::Query<Parameters<'_>>,
     pg_pool: web::Data<PgPool>,
 ) -> Result<HttpResponse, ConfirmSubscriptionTokenError> {
     parameters
