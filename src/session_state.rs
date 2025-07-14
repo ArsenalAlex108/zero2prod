@@ -6,7 +6,6 @@ use actix_session::{
 };
 use actix_web::FromRequest;
 use eyre::bail;
-use futures::FutureExt;
 use uuid::Uuid;
 
 use crate::utils::Pipe;

@@ -1,12 +1,8 @@
-use uuid::Uuid;
-use zero2prod::{
-    authentication::BasicAuthCredentials, utils::Pipe,
-};
+use zero2prod::utils::Pipe;
 
 use crate::common::{
     self, TestApp, assert_is_redirect_to,
     create_test_newsletter_writer, email_server,
-    get_test_newsletter_writer,
 };
 
 #[actix_web::test]
@@ -106,79 +102,6 @@ async fn newsletter_is_not_sent_to_unconfirmed_subscribers()
         text.contains("Newsletter successfully posted")
     );
     // Confirm Mock email client received no requests
-}
-
-#[deprecated(
-    note = "No newsletter data validation specified and API is expected to serve human users."
-)]
-#[actix_web::test]
-async fn newsletter_returns_400_for_invalid_body() {
-    // Spawn app V
-    let app = common::spawn_app().await;
-
-    app.post_login_with_default().await.unwrap();
-
-    // Create newsletter V
-    // A sketch of the newsletter payload structure.
-    // We might change it later on.
-    let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter title",
-        "content": {
-        "text": "Newsletter body as plain text",
-        // Missing:
-        // "html": "<p>Newsletter body as HTML</p>",
-        }
-    });
-
-    // Send using public API
-    let response = app
-        .post_newsletter(&newsletter_request_body)
-        .await
-        .expect("Failed to send request.");
-
-    assert_eq!(response.status().as_u16(), 400, "todo");
-}
-
-#[actix_web::test]
-async fn newsletter_redirect_to_get_with_error_for_fatal_database_error()
- {
-    // Spawn app V
-    let app = common::spawn_app().await;
-
-    app.post_login_with_default().await.unwrap();
-
-    sqlx::query!(
-        "--sql
-    DROP SCHEMA public CASCADE"
-    )
-    .execute(&app.db_pool)
-    .await
-    .unwrap();
-
-    // Create newsletter V
-    let newsletter_request_body = serde_json::json!({
-        "title": "Newsletter title",
-        "content_text": "Newsletter body as plain text",
-        "content_html": "<p>Newsletter body as HTML</p>",
-    });
-
-    // Send using public API
-    let response = app
-        .post_newsletter(&newsletter_request_body)
-        .await
-        .expect("Failed to send request.");
-
-    assert_is_redirect_to(&response, "/admin/newsletters");
-
-    let text = app
-        .get_newsletter_form()
-        .await
-        .unwrap()
-        .text()
-        .await
-        .unwrap();
-
-    assert!(text.contains("One or more errors occurred trying to post the newsletter"));
 }
 
 #[actix_web::test]

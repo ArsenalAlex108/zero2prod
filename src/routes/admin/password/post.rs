@@ -12,7 +12,6 @@ use uuid::Uuid;
 
 use crate::{
     authentication::{self, UserId},
-    session_state::TypedSession,
     utils::{Pipe, see_other_response},
 };
 use argon2::PasswordHasher;

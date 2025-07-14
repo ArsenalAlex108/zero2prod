@@ -1,4 +1,3 @@
-use actix_web::http::Uri;
 use core::str;
 use eyre::Context;
 use once_cell::sync::Lazy;

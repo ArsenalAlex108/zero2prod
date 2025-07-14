@@ -1,4 +1,3 @@
-use std::convert::identity;
 
 use actix_web::body::MessageBody;
 use actix_web::error::InternalError;

@@ -6,11 +6,11 @@ on:
   # this specific branch (a.k.a. book chapter).
   push:
     branches:
-      - new-root-chapter-10
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
-      - new-root-chapter-10
+      - main
 
 env:
   CARGO_TERM_COLOR: always
@@ -35,6 +35,10 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
     steps:
       # Downloads a copy of the code in your repository before running CI tests
       - name: Check out repository code
@@ -120,6 +124,10 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
       - name: Install the Rust toolchain

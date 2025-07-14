@@ -4,10 +4,7 @@ use std::{
 };
 
 use crate::{
-    authentication::{
-        self, BasicAuthCredentials,
-        NewsletterWritersAuthenticationError, UserId,
-    },
+    authentication::UserId,
     domain::SubscriberEmail,
     email_client::EmailClient,
     hkt::{K1, SharedPointerHKT},
@@ -52,52 +49,6 @@ impl<'a> From<FormData<'a>> for BodyData<'a> {
     }
 }
 
-#[deprecated(
-    note = "Authentication Errors are never returned."
-)]
-#[derive(Debug, thiserror::Error)]
-pub enum PublishNewsletterError {
-    #[error("Authentication failed.")]
-    Authentication(
-        #[source] lazy_errors::Error<eyre::Report>,
-    ),
-    #[error(transparent)]
-    Unexpected(#[from] lazy_errors::Error<eyre::Report>),
-}
-
-impl From<NewsletterWritersAuthenticationError>
-    for PublishNewsletterError
-{
-    fn from(
-        value: NewsletterWritersAuthenticationError,
-    ) -> Self {
-        match value {
-            NewsletterWritersAuthenticationError::Authentication(_) => PublishNewsletterError::Authentication(value.into()),
-            NewsletterWritersAuthenticationError::Unexpected(_) => PublishNewsletterError::Unexpected(value.into()),
-        }
-    }
-}
-
-impl actix_web::ResponseError for PublishNewsletterError {
-    fn error_response(
-        &self,
-    ) -> HttpResponse<actix_web::body::BoxBody> {
-        match self {
-            PublishNewsletterError::Authentication(_) =>
-                HttpResponse::Unauthorized()
-                .insert_header((
-                    actix_web::http::header::WWW_AUTHENTICATE,
-                "Basic realm=\"publish\""
-                    .pipe(actix_web::http::header::HeaderValue::from_str)
-                    .expect("The above literal is valid Header value.")
-                ))
-                .finish()
-            ,
-            PublishNewsletterError::Unexpected(_) => HttpResponse::InternalServerError().finish(),
-        }
-    }
-}
-
 #[tracing::instrument(
     name = "Publishing Newsletter To Confirmed Subscribers",
     skip(pool, email_client, body)
@@ -114,10 +65,6 @@ pub async fn publish_newsletter(
         startup::GlobalSharedPointerType,
     >(pool, email_client, body.0.into(), user_id.into_inner())
     .await
-    .map_err(|e| {
-        actix_web_flash_messages::FlashMessage::error("<p><i>One or more errors occurred trying to post the newsletter.</i></p>").send();
-        e
-    })
 }
 
 #[tracing::instrument(

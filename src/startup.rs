@@ -4,7 +4,7 @@ use actix_session::{
     SessionMiddleware, storage::CookieSessionStore,
 };
 use actix_web::{
-    App, HttpServer, cookie,
+    App, HttpServer,
     dev::Server,
     web::{self},
 };
@@ -28,7 +28,7 @@ use crate::{
         health_check, home, login, login_form, logout,
         post_reset_password, publish_newsletter, subscribe,
     },
-    utils::{self, Pipe},
+    utils::{Pipe},
 };
 use secrecy::ExposeSecret;
 

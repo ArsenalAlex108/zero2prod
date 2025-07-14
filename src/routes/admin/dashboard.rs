@@ -1,7 +1,6 @@
-use actix_session::Session;
 use actix_web::{
     HttpResponse,
-    http::header::{ContentType, LOCATION},
+    http::header::ContentType,
     web,
 };
 use sqlx::PgPool;

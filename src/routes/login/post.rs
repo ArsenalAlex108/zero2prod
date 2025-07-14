@@ -1,26 +1,16 @@
 use std::borrow::Cow;
 
-use actix_session::Session;
 use actix_web::HttpResponse;
-use actix_web::error::InternalError;
 use actix_web::http::header::LOCATION;
 use actix_web::web;
-use eyre::Context;
 use nameof::name_of;
 use secrecy::SecretString;
 use sqlx::PgPool;
-use uuid::Uuid;
 
 use crate::authentication;
 use crate::authentication::BasicAuthCredentials;
 use crate::authentication::NewsletterWritersAuthenticationError;
-use crate::configuration::HmacSecret;
 use crate::session_state::TypedSession;
-use crate::startup;
-use crate::utils::Pipe;
-use crate::utils::see_other_response;
-use hmac::Mac;
-use secrecy::ExposeSecret;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct LoginFormData<'a> {

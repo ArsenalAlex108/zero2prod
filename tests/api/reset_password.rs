@@ -211,7 +211,7 @@ async fn reset_password_persists_new_password_to_database_after_success()
 
     let new_password = Uuid::new_v4().to_string();
 
-    let response = app.post_reset_password(
+    let _response = app.post_reset_password(
         &serde_json::json!({
             "old_password": test_user.raw_password.as_ref().expose_secret(),
             "new_password": &new_password,

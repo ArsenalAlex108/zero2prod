@@ -1,16 +1,8 @@
 use actix_web::{
-    HttpResponse, http::header::ContentType, web,
+    HttpResponse, http::header::ContentType,
 };
-use eyre::Context;
-use hmac::Hmac;
-use hmac::Mac;
-use secrecy::ExposeSecret;
-use std::borrow::Cow;
 
 use crate::utils::Pipe;
-use crate::{
-    configuration::HmacSecret, hkt::RefHKT, startup,
-};
 use std::fmt::Write;
 
 pub async fn login_form(

@@ -4,7 +4,6 @@ use crate::{
     authentication, telemetry,
     utils::{self, Pipe},
 };
-use actix_web::web;
 use argon2::{
     Argon2, PasswordHash, PasswordVerifier, password_hash,
 };

@@ -2,7 +2,6 @@ use actix_web::{
     HttpResponse, http::header::ContentType, web,
 };
 use std::fmt::Write;
-use uuid::Uuid;
 
 use crate::authentication::UserId;
 
