@@ -5,8 +5,14 @@ use reqwest::{Client, Url};
 use secrecy::ExposeSecret;
 use secrecy::SecretString;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
+use std::ops::DerefMut;
 use std::{borrow::Cow, ops::Deref};
 use uuid::Uuid;
+use zero2prod::email_client::EmailClient;
+use zero2prod::hkt::HKT1Unsized;
+use zero2prod::issue_delivery_worker::SingleNewsletterPickingAndSendingTaskResult;
+use zero2prod::issue_delivery_worker::get_single_newsletter_picking_and_sending_iterator;
+use zero2prod::utils::SyncMutCell;
 use zero2prod::{
     authentication::BasicAuthCredentials,
     configuration::{
@@ -24,17 +30,21 @@ use argon2::{
 
 use anyhow::anyhow;
 
-pub struct TestApp<'a> {
+pub struct TestApp<
+    'a,
+    P: RefHKT = startup::GlobalSharedPointerType,
+> {
     pub address: Cow<'a, str>,
     pub db_pool: PgPool,
     pub email_server: wiremock::MockServer,
     pub port: u16,
     pub http_client: reqwest::Client,
+    pub email_client: EmailClient<P>,
 }
 
 pub mod email_server;
 
-impl TestApp<'_> {
+impl<P: RefHKT> TestApp<'_, P> {
     pub async fn post_subscriptions(
         &self,
         body: impl Into<reqwest::Body>,
@@ -207,6 +217,26 @@ impl TestApp<'_> {
     }
 }
 
+impl<P: SharedPointerHKT> TestApp<'_, P> {
+    pub async fn dispatch_all_pending_emails(&self) {
+        let mut connection =
+            self.db_pool.begin().await.unwrap();
+        let mut connection_ptr =
+            SyncMutCell::from(connection.deref_mut());
+
+        let iterator = get_single_newsletter_picking_and_sending_iterator(
+            &self.email_client,
+            &connection_ptr
+        );
+
+        for task in iterator {
+            if let SingleNewsletterPickingAndSendingTaskResult::NothingFound = task.await {
+                break;
+            }
+        }
+    }
+}
+
 pub const TEST: &str = "test";
 pub const DEBUG: &str = "debug";
 pub const TEST_LOG: &str = "TEST_LOG";
@@ -234,13 +264,14 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 
 /// Spinup an instance of our application
 /// and returns its address(i.e.http://localhost:XXXX)
-pub async fn spawn_app<'a>() -> TestApp<'a> {
+pub async fn spawn_app<'a>()
+-> TestApp<'a, startup::GlobalSharedPointerType> {
     spawn_app_generic::<startup::GlobalSharedPointerType>()
         .await
 }
 
 pub async fn spawn_app_generic<'a, P: SharedPointerHKT>()
--> TestApp<'a>
+-> TestApp<'a, P>
 where
     P::T<str>: Send + Sync,
     P::T<Client>: Send + Sync,
@@ -318,6 +349,11 @@ where
         email_server,
         port,
         http_client,
+        email_client: configuration
+            .email_client
+            .as_ref()
+            .clone()
+            .client(),
     }
 }
 

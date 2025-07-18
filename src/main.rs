@@ -1,11 +1,19 @@
 use eyre::Context;
 use secrecy::SecretString;
-use std::convert::identity;
+use std::{
+    convert::identity,
+    fmt::{Debug, Display},
+};
+use tokio::task::JoinError;
 
 use reqwest::Client;
 use zero2prod::{
-    configuration::get_configuration,
+    configuration::{
+        ApplicationSettings, DatabaseSettings,
+        EmailClientSettings, get_configuration,
+    },
     hkt::SharedPointerHKT,
+    issue_delivery_worker,
     startup::{self, Application},
     telemetry::{get_subscriber, init_subscriber},
     utils::Pipe,
@@ -24,6 +32,9 @@ where
     P::T<str>: Send + Sync,
     P::T<Client>: Send + Sync,
     P::T<SecretString>: Send + Sync,
+    P::T<DatabaseSettings<P>>: Send + Sync,
+    P::T<ApplicationSettings<P>>: Send + Sync,
+    P::T<EmailClientSettings<P>>: Send + Sync,
 {
     let subscriber = get_subscriber(
         stringify!(zero2prod).into(),
@@ -35,36 +46,53 @@ where
     let configuration = get_configuration::<P>()
         .expect("Failed to find configuration file.");
 
-    Application::build(&configuration)
+    let application = Application::build(&configuration)
         .await?
-        .pipe(|i| {
-            use rodio::{
-                Decoder, OutputStream, source::Source,
-            };
-            use std::fs::File;
-            use std::io::BufReader;
-
-            let (_stream, stream_handle) =
-                OutputStream::try_default().expect(
-                    "rodio default OutputStream success.",
-                );
-
-            File::open("audio/startup_finished.mp3")
-                .ok()
-                .map(BufReader::new)
-                .map(Decoder::new)
-                .map(Result::ok)
-                .and_then(identity)
-                .map(|source| {
-                    stream_handle
-                        .play_raw(source.convert_samples())
-                });
-
-            dbg!("Starting...");
-
-            i
-        })
         .run_until_stopped()
-        .await
-        .context("Application should run successfully.")
+        .pipe(tokio::spawn);
+    // .await
+    // .context("Application should run successfully.")
+
+    let worker =
+        issue_delivery_worker::run_worker_until_stopped(
+            configuration,
+        )
+        .pipe(tokio::spawn);
+
+    tokio::select! {
+        i = application => report_exit("Application", i),
+        i = worker => report_exit("Background Worker", i),
+    };
+
+    Ok(())
+}
+
+fn report_exit(
+    task_name: &str,
+    outcome: Result<
+        Result<(), impl Debug + Display>,
+        JoinError,
+    >,
+) {
+    match outcome {
+        Ok(Ok(())) => {
+            tracing::info!("{} has exited", task_name)
+        }
+        Ok(Err(e)) => {
+            tracing::error!(
+            error.cause_chain = ?e,
+            error.message = %e,
+            "{} failed",
+            task_name
+            )
+        }
+        Err(e) => {
+            tracing::error!(
+            error.cause_chain = ?e,
+            error.message = %e,
+            "{}' task failed to complete",
+            task_name
+            )
+        }
+    }
 }

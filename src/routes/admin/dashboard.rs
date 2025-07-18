@@ -1,7 +1,5 @@
 use actix_web::{
-    HttpResponse,
-    http::header::ContentType,
-    web,
+    HttpResponse, http::header::ContentType, web,
 };
 use sqlx::PgPool;
 use uuid::Uuid;

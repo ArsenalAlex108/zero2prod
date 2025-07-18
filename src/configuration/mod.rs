@@ -10,6 +10,7 @@ use tracing_log::log;
 use crate::domain::{
     SubscriberEmail, SubscriberEmailParseError,
 };
+use crate::email_client::EmailClient;
 use crate::hkt::{
     HKT1Unsized, K1, RefHKT, SharedPointerHKT,
 };
@@ -110,6 +111,18 @@ impl<P: SharedPointerHKT> EmailClientSettings<P> {
     ) -> Result<SubscriberEmail<P>, SubscriberEmailParseError>
     {
         SubscriberEmail::try_from(self.sender_email.clone())
+    }
+
+    pub fn client(self) -> EmailClient<P> {
+        let sender = self.sender().expect("Valid email");
+        let timeout = self.timeout();
+
+        EmailClient::new(
+            self.base_url,
+            sender,
+            self.authorization_token,
+            timeout,
+        )
     }
 }
 

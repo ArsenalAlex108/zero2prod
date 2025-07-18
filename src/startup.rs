@@ -28,7 +28,7 @@ use crate::{
         health_check, home, login, login_form, logout,
         post_reset_password, publish_newsletter, subscribe,
     },
-    utils::{Pipe},
+    utils::Pipe,
 };
 use secrecy::ExposeSecret;
 
@@ -162,15 +162,11 @@ impl Application {
         let sender_email =
             configuration.email_client.sender().unwrap();
 
-        let email_client = EmailClient::new(
-            configuration.email_client.base_url.clone(),
-            sender_email,
-            configuration
-                .email_client
-                .authorization_token
-                .clone(),
-            configuration.email_client.timeout(),
-        );
+        let email_client = configuration
+            .email_client
+            .as_ref()
+            .clone()
+            .client();
 
         let address = format!(
             "{}:{}",

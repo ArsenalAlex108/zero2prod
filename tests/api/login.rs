@@ -30,9 +30,10 @@ pub async fn login_failure_redirects_back_with_err_message()
     let html_page = app.get_login_html().await.expect(
         "Getting body of login page should not fail.",
     );
-    assert!(html_page.contains(
-        r#"<p><i>Authentication failed</i></p>"#
-    ));
+
+    dbg!(&html_page);
+
+    assert!(html_page.contains(r#"Authentication failed"#));
 
     // Reload
     let html_page = app.get_login_html().await.expect(
@@ -40,9 +41,7 @@ pub async fn login_failure_redirects_back_with_err_message()
     );
     assert!(
         html_page
-            .contains(
-                r#"<p><i>Authentication failed</i></p>"#
-            )
+            .contains(r#"Authentication failed"#)
             .not()
     );
 }

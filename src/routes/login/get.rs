@@ -1,6 +1,4 @@
-use actix_web::{
-    HttpResponse, http::header::ContentType,
-};
+use actix_web::{HttpResponse, http::header::ContentType};
 
 use crate::utils::Pipe;
 use std::fmt::Write;

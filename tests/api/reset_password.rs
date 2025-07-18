@@ -173,11 +173,13 @@ async fn reset_password_redirect_to_dashboard_with_success_after_correct_old_pas
             "Logging in with test user must be successful.",
         );
 
+    let new_password = Uuid::new_v4().to_string();
+
     let response = app.post_reset_password(
         &serde_json::json!({
             "old_password": test_user.raw_password.as_ref().expose_secret(),
-            "new_password": Uuid::new_v4().to_string(),
-            "confirm_new_password": Uuid::new_v4().to_string(),
+            "new_password": &new_password,
+            "confirm_new_password": &new_password,
         })
     )
     .await
@@ -188,11 +190,21 @@ async fn reset_password_redirect_to_dashboard_with_success_after_correct_old_pas
         "/admin/reset_password",
     );
 
-    let text = app.get_admin_dashboard_html().await.expect(
-        "A response body should always be returned.",
-    );
+    let text = app
+        .get_reset_password_form()
+        .await
+        .expect(
+            "A response body should always be returned.",
+        )
+        .text()
+        .await
+        .unwrap();
 
-    assert!(text.contains("Reset password success"));
+    dbg!(&text);
+
+    assert!(
+        text.contains("Resetted Password successfully")
+    );
 }
 
 #[actix_web::test]

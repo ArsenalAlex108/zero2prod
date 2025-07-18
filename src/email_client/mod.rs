@@ -60,6 +60,13 @@ impl<P: SharedPointerHKT> EmailClient<P> {
     ) -> Result<(), reqwest::Error> {
         let url = format!("{}/email", self.base_url);
 
+        if cfg!(test) {
+            tracing::debug!(
+                "Print Recipient: {}",
+                recipient.as_ref().to_string()
+            );
+        }
+
         let request_body = SendEmailRequest {
             from: self.base_url.clone(),
             to: recipient.into(),

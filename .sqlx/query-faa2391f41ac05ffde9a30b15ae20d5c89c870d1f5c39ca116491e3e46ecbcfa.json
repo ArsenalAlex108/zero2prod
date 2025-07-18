@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "--sql\n        SET TRANSACTION ISOLATION LEVEL READ COMMITTED;\n    ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "faa2391f41ac05ffde9a30b15ae20d5c89c870d1f5c39ca116491e3e46ecbcfa"
+}

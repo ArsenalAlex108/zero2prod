@@ -22,7 +22,7 @@ pub struct BasicAuthCredentials<'a> {
 }
 
 impl BasicAuthCredentials<'_> {
-    pub fn into_owned<'b>(
+    pub fn clone_owned<'b>(
         self,
     ) -> BasicAuthCredentials<'b> {
         BasicAuthCredentials {
@@ -147,7 +147,7 @@ pub async fn authenticate_newsletter_writer(
         )
     });
 
-    let credentials = credentials.into_owned();
+    let credentials = credentials.clone_owned();
     let raw_password = credentials.raw_password;
 
     let (record_result, query_error) = query_result
