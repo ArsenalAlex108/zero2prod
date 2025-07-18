@@ -12,10 +12,7 @@ use crate::{
     email_client::EmailClient,
     hkt::{
         K1, SharedPointerHKT,
-        traversable::{
-            traverse_result_future,
-            traverse_result_future_result,
-        },
+        traversable::traverse_result_future,
     },
     startup::get_connection_pool,
     utils::{Pipe as _, SyncMutCell},
@@ -68,45 +65,6 @@ pub async fn run_worker_until_stopped<
 
     for task in iterator {
         task.await;
-    }
-
-    Ok(())
-}
-
-#[tracing::instrument(
-    name = "Get and uniquely lock a task in the issue delivery queue.",
-    skip(connection, email_client)
-)]
-async fn send_newsletter<P: SharedPointerHKT>(
-    title: String,
-    html: String,
-    text: String,
-    newsletter_issue_id: Uuid,
-    email_client: &EmailClient<P>,
-    connection: &mut sqlx::PgConnection,
-) -> Result<(), eyre::Report> {
-    let subject = P::from_string(title);
-    let html_content = P::from_string(html);
-    let text_content = P::from_string(text);
-
-    //let connection_ptr = RefCell::new(connection);
-    let connection_ptr = SyncMutCell::from(connection);
-
-    let iterator = get_sending_to_subscribers_of_single_newsletter_issue_iterator(
-        &subject,
-        &html_content,
-        &text_content,
-        &newsletter_issue_id,
-        email_client,
-        &connection_ptr
-    );
-
-    for task in iterator {
-        match task.await {
-            ControlFlow::Continue(()) => continue,
-            ControlFlow::Break(Ok(())) => return Ok(()),
-            ControlFlow::Break(Err(e)) => return Err(e),
-        }
     }
 
     Ok(())

@@ -159,9 +159,6 @@ impl Application {
         let connection_pool =
             get_connection_pool(&configuration.database);
 
-        let sender_email =
-            configuration.email_client.sender().unwrap();
-
         let email_client = configuration
             .email_client
             .as_ref()

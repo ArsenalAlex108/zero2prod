@@ -9,7 +9,6 @@ use std::ops::DerefMut;
 use std::{borrow::Cow, ops::Deref};
 use uuid::Uuid;
 use zero2prod::email_client::EmailClient;
-use zero2prod::hkt::HKT1Unsized;
 use zero2prod::issue_delivery_worker::SingleNewsletterPickingAndSendingTaskResult;
 use zero2prod::issue_delivery_worker::get_single_newsletter_picking_and_sending_iterator;
 use zero2prod::utils::SyncMutCell;
@@ -221,7 +220,7 @@ impl<P: SharedPointerHKT> TestApp<'_, P> {
     pub async fn dispatch_all_pending_emails(&self) {
         let mut connection =
             self.db_pool.begin().await.unwrap();
-        let mut connection_ptr =
+        let connection_ptr =
             SyncMutCell::from(connection.deref_mut());
 
         let iterator = get_single_newsletter_picking_and_sending_iterator(

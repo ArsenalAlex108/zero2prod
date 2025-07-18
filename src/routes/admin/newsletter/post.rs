@@ -1,9 +1,7 @@
 use crate::{
     authentication::UserId,
-    domain::SubscriberEmail,
-    email_client::EmailClient,
     hkt::{
-        K1, SharedPointerHKT,
+        SharedPointerHKT,
         traversable::traverse_result_future_result,
     },
     idempotency::{
@@ -15,7 +13,6 @@ use crate::{
 use actix_web::{HttpResponse, error::InternalError, web};
 use const_format::formatcp;
 use eyre::Context;
-use lazy_errors::{ErrorStash, StashErr};
 use nameof::name_of;
 use sqlx::Executor as _;
 use sqlx::PgPool;
@@ -62,13 +59,10 @@ impl<'a> From<FormData<'a>> for BodyData<'a> {
 
 #[tracing::instrument(
     name = "Publishing Newsletter To Confirmed Subscribers",
-    skip(pool, email_client, body)
+    skip(pool, body)
 )]
 pub async fn publish_newsletter(
     pool: web::Data<PgPool>,
-    email_client: web::Data<
-        EmailClient<startup::GlobalSharedPointerType>,
-    >,
     body: web::Form<FormData<'_>>,
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, actix_web::Error> {
@@ -76,7 +70,6 @@ pub async fn publish_newsletter(
         startup::GlobalSharedPointerType,
     >(
         pool,
-        email_client,
         body.0.into(),
         user_id.into_inner(),
     )
@@ -84,70 +77,13 @@ pub async fn publish_newsletter(
 }
 
 #[tracing::instrument(
-    name = "Sending newsletters to confirmed subscribers.",
-    skip(subscriber_emails, email_client)
-)]
-async fn send_newsletter<P: SharedPointerHKT>(
-    title: String,
-    content: Content<'_>,
-    subscriber_emails: impl IntoIterator<
-        Item = SubscriberEmailRaw<'_>,
-    >,
-    email_client: &EmailClient<P>,
-) -> Result<(), lazy_errors::Error<eyre::Report>> {
-    let Content { html, text } = content;
-    let subject = P::from_string(title);
-    let html_content = P::from_string(html.into_owned());
-    let text_content = P::from_string(text.into_owned());
-
-    let mut error_stash =
-        ErrorStash::<_, _, eyre::Report>::new(
-            || "One or more Errors occurred trying to sent newsletter to confirmed subscribers.",
-        );
-
-    subscriber_emails.into_iter()
-    .filter_map(|i| {
-        SubscriberEmail::try_from(i.email.as_ref().to_string())
-        .inspect_err(|e| tracing::warn!("Found subscriber with invalid email while attempting to send a newsletter to them: '{0}'\n
-        Error: '{e}'", i.email))
-        .ok()
-    })
-    .map(
-        async |i| email_client
-        .send_email(
-            i.pipe_ref(SubscriberEmail::clone),
-            subject.pipe_ref(K1::clone),
-            html_content.pipe_ref(K1::clone),
-            text_content.pipe_ref(K1::clone),
-        ).await
-        .map_err(|e| e
-            .pipe(eyre::Report::new)
-            .wrap_err(format!("Failed to send newsletter to: '{}'", i))
-        )
-        // .inspect_err(|e| tracing::error!("{}", format!("Failed to send newsletter to: '{}'", i)))
-    )
-    //.pipe(futures::future::join_all)
-    .pipe(crate::utils::await_sequential)
-    .await
-    .into_iter()
-    .pipe(|i|
-        <_ as StashErr::<_, _, _, eyre::Report>>::stash_err(i, &mut error_stash)
-        // Iterator must be used to collect errors.
-        .collect::<()>()
-    );
-
-    error_stash.into_result()
-}
-
-#[tracing::instrument(
     name = "Publishing Newsletter To Confirmed Subscribers (Generic)",
-    skip(pool, email_client, body)
+    skip(pool, body)
 )]
 async fn publish_newsletter_with_pointer<
     P: SharedPointerHKT,
 >(
     pool: web::Data<PgPool>,
-    email_client: web::Data<EmailClient<P>>,
     body: BodyData<'_>,
     user_id: UserId,
 ) -> Result<HttpResponse, actix_web::Error>

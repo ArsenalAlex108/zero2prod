@@ -1,9 +1,5 @@
-use eyre::Context;
 use secrecy::SecretString;
-use std::{
-    convert::identity,
-    fmt::{Debug, Display},
-};
+use std::fmt::{Debug, Display};
 use tokio::task::JoinError;
 
 use reqwest::Client;
