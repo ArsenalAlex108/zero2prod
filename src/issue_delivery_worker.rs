@@ -1,5 +1,5 @@
 use std::{
-    ops::{ControlFlow, DerefMut},
+    ops::ControlFlow,
     time::Duration,
 };
 
@@ -55,7 +55,7 @@ pub async fn run_worker_until_stopped<
         )?;
 
     let connection_ptr =
-        SyncMutCell::from(transaction.deref_mut());
+        SyncMutCell::from(&mut *transaction);
 
     let iterator = get_newsletter_sending_worker_iterator(
         &email_client,
@@ -83,7 +83,7 @@ pub async fn get_newsletter_sending_worker_iterator<
     [()]
     .into_iter()
     .cycle()
-    .map(async |_|{
+    .map(async |()|{
 
         let iterator = get_single_newsletter_picking_and_sending_iterator(
             email_client,
@@ -156,7 +156,7 @@ pub fn get_single_newsletter_picking_and_sending_iterator<P: SharedPointerHKT>(
     .map(async |acquire_task| {
         let mut connection_borrow = connection_ptr.borrow();
 
-        let connection: &mut sqlx::PgConnection = connection_borrow.deref_mut();
+        let connection: &mut sqlx::PgConnection = *connection_borrow;
 
         struct NewsletterContent {
             title: String,
@@ -201,7 +201,7 @@ pub fn get_single_newsletter_picking_and_sending_iterator<P: SharedPointerHKT>(
 
                     for task in iterator {
                         match task.await {
-                            ControlFlow::Continue(()) => continue,
+                            ControlFlow::Continue(()) => {},
                             ControlFlow::Break(Ok(())) => return R::Completed,
                             ControlFlow::Break(Err(e)) => return R::Error(e)
                         }

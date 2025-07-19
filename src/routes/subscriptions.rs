@@ -1,5 +1,3 @@
-use std::ops::DerefMut;
-
 use crate::{
     domain::{
         NewSubscriber, NewSubscriberParseError,
@@ -61,6 +59,7 @@ pub async fn subscribe(
         email_client,
         base_url,
     )
+    .pipe(Box::pin)
     .await
 }
 
@@ -91,14 +90,14 @@ pub async fn subscribe_with_shared_pointer<
                 .map(async |subscriber| {
                     insert_subscriber::<P>(
                         &subscriber,
-                        transaction.deref_mut(),
+                        &mut *transaction,
                     )
                     .await
                     .context("Failed to insert new subscriber to database.")
                     .map_err(SubscribeError::from)
                     .map(async |subscriber_id| {
                         store_token::<P>(
-                            transaction.deref_mut(),
+                            &mut *transaction,
                             &subscriber_id,
                         )
                         .await
@@ -127,7 +126,7 @@ pub async fn subscribe_with_shared_pointer<
                 })
                 .pipe(traverse_result_future_result)
                 .await
-                .map(async |_| {
+                .map(async |()| {
                     transaction
                         .commit()
                         .await
@@ -139,7 +138,7 @@ pub async fn subscribe_with_shared_pointer<
         })
         .pipe(traverse_result_future_result)
         .await
-        .map(|_| HttpResponse::Ok().finish())
+        .map(|()| HttpResponse::Ok().finish())
 }
 
 #[tracing::instrument(
@@ -238,8 +237,8 @@ pub async fn insert_subscriber<P: SharedPointerHKT>(
         VALUES ($1, $2, $3, $4, 'pending_confirmation')
         "#,
         subscriber_id,
-        form.email.deref(),
-        form.name.deref(),
+        &*form.email,
+        &*form.name,
         Utc::now()
     )
     .execute(connection)

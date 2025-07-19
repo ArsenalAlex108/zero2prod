@@ -16,7 +16,7 @@ impl TypedSession {
     const USER_ID_KEY: &'static str = "user_id";
 
     pub fn renew(&self) {
-        self.0.renew()
+        self.0.renew();
     }
 
     pub fn insert_user_id(
@@ -33,7 +33,7 @@ impl TypedSession {
     }
 
     pub fn logout(&self) {
-        self.0.purge()
+        self.0.purge();
     }
 
     pub fn get_required_user_id(

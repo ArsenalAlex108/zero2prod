@@ -16,7 +16,6 @@ use eyre::Context;
 use nameof::name_of;
 use sqlx::Executor as _;
 use sqlx::PgPool;
-use std::ops::DerefMut;
 use std::{
     borrow::Cow,
     fmt::{Debug, Display},
@@ -132,7 +131,7 @@ where
         SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
     "
     )
-    .execute(transaction.deref_mut())
+    .execute(&mut *transaction)
     .await
     .map_err(redirect_to_self_with_err)?;
 
@@ -148,28 +147,8 @@ where
         return Ok(saved_response);
     }
 
-    let addresses = get_confirmed_subscribers_emails_raw(&pool)
-    .await
-    .context("Failed to query for confirmed subscribers from database.")
-    .map_err(redirect_to_self_with_err)?;
-
-    if cfg!(test) {
-        let dbg_string = addresses
-            .iter()
-            .map(|i| i.email.as_ref())
-            .enumerate()
-            .fold(String::new(), |a, b| {
-                a + if b.0 == 0 { "" } else { ", " } + b.1
-            });
-
-        tracing::debug!(
-            "Print Confirmed Subscribers: {}",
-            dbg_string
-        );
-    }
-
     let issue_id = insert_newsletter_issue(
-        transaction.deref_mut(),
+        &mut *transaction,
         &title,
         &content.text,
         &content.html,
@@ -178,7 +157,7 @@ where
     .map_err(redirect_to_self_with_err)?;
 
     enqueue_delivery_tasks(
-        transaction.deref_mut(),
+        &mut *transaction,
         issue_id,
     )
     .await
@@ -194,7 +173,7 @@ where
     .map_err(redirect_to_self_with_err)
     .map(async |r| {
         Ok(())
-            .map(async |_| {
+            .map(async |()| {
                 transaction
                     .commit()
                     .await
@@ -202,8 +181,8 @@ where
             })
             .pipe(traverse_result_future_result)
             .await
-            .inspect(|_| success().send())
-            .map(|_| r)
+            .inspect(|()| success().send())
+            .map(|()| r)
     })
     .pipe(traverse_result_future_result)
     .await
@@ -232,28 +211,6 @@ fn redirect_to_self_with_err<
     see_other_response("/admin/newsletters").pipe(|r| {
         InternalError::from_response(cause, r).into()
     })
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct SubscriberEmailRaw<'a> {
-    pub email: Cow<'a, str>,
-}
-
-#[tracing::instrument(
-    name = "Get email address of confirmed subscribers without any validation.",
-    skip(pool)
-)]
-async fn get_confirmed_subscribers_emails_raw(
-    pool: &PgPool,
-) -> Result<Vec<SubscriberEmailRaw<'_>>, sqlx::Error> {
-    sqlx::query_as!(
-        SubscriberEmailRaw::<'_>,
-        "--sql
-    SELECT email FROM subscriptions 
-    WHERE status = 'confirmed'"
-    )
-    .fetch_all(pool)
-    .await
 }
 
 #[tracing::instrument(skip_all)]

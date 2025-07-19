@@ -31,10 +31,6 @@ pub trait Pipe {
 
 impl<T: ?Sized> Pipe for T {}
 
-pub fn not_called<A, B>(_: A) -> B {
-    panic!("This function is not supposed to be called.")
-}
-
 pub fn unpack_result_to_some_tuple<T, E>(
     i: Result<T, E>,
 ) -> (Option<T>, Option<E>) {
@@ -53,7 +49,7 @@ pub fn unpack_result_to_result_tuple<T, E>(
     }
 }
 
-pub fn see_other_response(
+#[must_use] pub fn see_other_response(
     location: &str,
 ) -> actix_web::HttpResponse {
     actix_web::HttpResponse::SeeOther()
@@ -84,7 +80,7 @@ where
     );
 
     for i in iter {
-        results.push(i.await)
+        results.push(i.await);
     }
 
     results

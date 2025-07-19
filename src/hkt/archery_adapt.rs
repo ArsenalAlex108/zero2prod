@@ -69,16 +69,16 @@ pub trait RefHKT: HKT1Unsized {
     fn from_box<T: ?Sized>(v: Box<T>) -> K1<Self, T>;
     fn deref<T: ?Sized>(value: &Self::T<T>) -> &T;
 
-    fn from_string(v: String) -> K1<Self, str> {
+    #[must_use] fn from_string(v: String) -> K1<Self, str> {
         Self::from_box(Box::<str>::from(v))
     }
-    fn from_str(v: &str) -> K1<Self, str> {
+    #[must_use] fn from_str(v: &str) -> K1<Self, str> {
         Self::from_box(Box::<str>::from(v))
     }
-    fn from_static_str(v: &'static str) -> K1<Self, str> {
+    #[must_use] fn from_static_str(v: &'static str) -> K1<Self, str> {
         Self::from_box(Box::<str>::from(v))
     }
-    fn from_vec<T>(v: Vec<T>) -> K1<Self, [T]> {
+    #[must_use] fn from_vec<T>(v: Vec<T>) -> K1<Self, [T]> {
         Self::from_box(Box::<[T]>::from(v))
     }
 }
@@ -169,7 +169,7 @@ pub trait SharedPointerHKT: RefHKT {
 //     }
 // }
 
-/// New type wrapper for P::T<A> of HKT P
+/// New type wrapper for `P::T`<A> of HKT P
 pub struct K1<P: HKT1Unsized, A: ?Sized>(P::T<A>);
 
 pub fn newtype<P: HKT1Unsized, A: ?Sized>(
@@ -190,7 +190,7 @@ where
         __derive_more_f: &mut derive_more::core::fmt::Formatter<'_>,
     ) -> derive_more::core::fmt::Result {
         derive_more::core::fmt::Display::fmt(
-            self.deref(),
+            &**self,
             __derive_more_f,
         )
     }
@@ -275,12 +275,12 @@ impl<P: SharedPointerHKT, A: ?Sized> Clone for K1<P, A> {
     }
 }
 
-/// Consider adding PartialEqHKT to allow implementors to customize and/or optimize impl
+/// Consider adding `PartialEqHKT` to allow implementors to customize and/or optimize impl
 impl<P: RefHKT, A: ?Sized + PartialEq> PartialEq
     for K1<P, A>
 {
     fn eq(&self, other: &Self) -> bool {
-        self.deref().eq(other.deref())
+        self.deref().eq(&**other)
     }
 }
 
@@ -293,13 +293,13 @@ impl<P: RefHKT, A: ?Sized + PartialOrd> PartialOrd
         &self,
         other: &Self,
     ) -> Option<std::cmp::Ordering> {
-        self.deref().partial_cmp(other.deref())
+        self.deref().partial_cmp(&**other)
     }
 }
 
 impl<P: RefHKT, A: ?Sized + Ord> Ord for K1<P, A> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.deref().cmp(other.deref())
+        self.deref().cmp(&**other)
     }
 }
 
@@ -319,7 +319,7 @@ impl<P: RefHKT, A: ?Sized + std::fmt::Debug> std::fmt::Debug
         f: &mut std::fmt::Formatter<'_>,
     ) -> std::fmt::Result {
         f.debug_tuple(name_of!(type K1<P,A>))
-            .field(&self.deref())
+            .field(&&**self)
             .finish()
     }
 }
@@ -520,7 +520,7 @@ impl RefHKT for BoxHKT {
     }
 
     fn deref<T: ?Sized>(value: &Self::T<T>) -> &T {
-        value.deref()
+        &**value
     }
 }
 

@@ -19,7 +19,7 @@ pub async fn get_reset_password_form(
         )
         .expect(
             "Write to string should have been successful.",
-        )
+        );
     });
 
     Ok(HttpResponse::Ok()

@@ -16,6 +16,7 @@ use crate::hkt::{
 };
 use crate::utils::Pipe;
 
+#[allow(clippy::pedantic)]
 pub mod generated;
 
 const APP_ENVIRONMENT: &str = name_of!(APP_ENVIRONMENT);
@@ -161,7 +162,7 @@ pub enum Environment {
     Production,
 }
 impl Environment {
-    pub fn as_str(&self) -> &'static str {
+    #[must_use] pub fn as_str(&self) -> &'static str {
         match self {
             Environment::Local => "local",
             Environment::Production => "production",

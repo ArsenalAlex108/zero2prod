@@ -48,7 +48,7 @@ pub async fn confirm_subscription_token(
         })
         .pipe(traversable::traverse_result_future_result)
         .await
-        .map(|_| HttpResponse::Ok().finish())
+        .map(|()| HttpResponse::Ok().finish())
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -139,7 +139,7 @@ async fn update_status_of_subscriber_id_to_confirmed(
             Ok(result) => {
                 let row_count = result.rows_affected();
                 if row_count == 1 { Ok(()) }
-                else { Err(E::AbnormalUpdatedRowCount(row_count as usize)) }
+                else { Err(E::AbnormalUpdatedRowCount(row_count.pipe(usize::try_from).unwrap())) }
             }
             Err(e) => {
                 E::Database(e)

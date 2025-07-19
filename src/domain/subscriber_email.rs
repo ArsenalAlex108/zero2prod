@@ -38,7 +38,7 @@ impl<P: RefHKT> Deref for SubscriberEmail<P> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        &*self.0
     }
 }
 
@@ -49,7 +49,7 @@ impl<P: SharedPointerHKT> Clone for SubscriberEmail<P> {
 }
 
 impl<P: RefHKT> SubscriberEmail<P> {
-    /// See also: try_from(K1<P,A>)
+    /// See also: `try_from(K1`<P,A>)
     pub fn parse(
         str: P::T<str>,
     ) -> Result<SubscriberEmail<P>, SubscriberEmailParseError>
@@ -59,7 +59,7 @@ impl<P: RefHKT> SubscriberEmail<P> {
         if str.deref().validate_email() {
             str.using(SubscriberEmail::<P>).using(Ok)
         } else {
-            format!("'{}' is not valid email.", str.deref())
+            format!("'{}' is not valid email.", &*str)
                 .using(E::Other)
                 .using(Err)
         }
@@ -110,7 +110,7 @@ impl<'de, P: RefHKT> serde::Deserialize<'de>
     where
         D: serde::Deserializer<'de>,
     {
-        K1::<P, str>::deserialize(deserializer).map(|i|SubscriberEmail::try_from(i.deref()).expect("Deserialized data are expected to satisfy invariants. Panic occurred because D::Error is opaque."))
+        K1::<P, str>::deserialize(deserializer).map(|i|SubscriberEmail::try_from(&*i).expect("Deserialized data are expected to satisfy invariants. Panic occurred because D::Error is opaque."))
     }
 }
 

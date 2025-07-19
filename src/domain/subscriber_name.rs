@@ -35,7 +35,7 @@ impl<P: RefHKT> SubscriberName<P> {
         // `.trim()` returns a view over the input `s` without trailing
         // whitespace-like characters.
         // `.is_empty` checks if the view contains any character.
-        let s_ref = s.deref();
+        let s_ref = &*s;
         let is_empty_or_whitespace =
             s_ref.trim().is_empty();
         // A grapheme is defined by the Unicode standard as a "user-perceived"
@@ -73,7 +73,7 @@ impl<P: RefHKT> Deref for SubscriberName<P> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        &*self.0
     }
 }
 
@@ -128,7 +128,7 @@ impl<'de, P: RefHKT> serde::Deserialize<'de>
     where
         D: serde::Deserializer<'de>,
     {
-        K1::<P, str>::deserialize(deserializer).map(|i|SubscriberName::try_from(i.deref()).expect("Deserialized data are expected to satisfy invariants. Panic occurred because D::Error is opaque."))
+        K1::<P, str>::deserialize(deserializer).map(|i|SubscriberName::try_from(&*i).expect("Deserialized data are expected to satisfy invariants. Panic occurred because D::Error is opaque."))
     }
 }
 
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn empty_string_is_rejected() {
-        let name = "".to_string();
+        let name = String::new();
         assert_err!(SubscriberName::<RcHKT>::parse(
             name.into()
         ));
@@ -200,7 +200,7 @@ mod tests {
                     )
                 );
             },
-        )
+        );
     }
 
     #[test]

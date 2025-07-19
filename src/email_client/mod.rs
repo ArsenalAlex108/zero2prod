@@ -1,10 +1,9 @@
-use std::ops::Deref;
-
 use crate::domain::SubscriberEmail;
 use crate::hkt::{K1, RefHKT, SharedPointerHKT};
 use kust::ScopeFunctions;
 use reqwest::Client;
 
+#[allow(clippy::pedantic)]
 pub mod generated;
 
 #[derive(Debug, derive_more::Into)]
@@ -79,7 +78,7 @@ impl<P: SharedPointerHKT> EmailClient<P> {
             .post(&url)
             .header(
                 X_POSTMARK_SERVER_TOKEN_HEADER,
-                self.authorization_token.deref(),
+                &*self.authorization_token,
             )
             .json(&request_body)
             .send()
@@ -175,7 +174,7 @@ mod tests {
     #[tokio::test]
     async fn send_email_sends_expected_request() {
         send_email_sends_expected_request_generic::<RcHKT>()
-            .await
+            .await;
     }
 
     async fn send_email_sends_expected_request_generic<
@@ -219,7 +218,7 @@ mod tests {
         send_email_fails_if_server_returns_code_n_generic::<
             RcHKT,
         >(500)
-        .await
+        .await;
     }
 
     async fn send_email_fails_if_server_returns_code_n_generic<
@@ -259,7 +258,7 @@ mod tests {
         send_email_fails_if_server_takes_too_long_generic::<
             RcHKT,
         >(180)
-        .await
+        .await;
     }
 
     async fn send_email_fails_if_server_takes_too_long_generic<

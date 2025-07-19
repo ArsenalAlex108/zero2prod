@@ -43,6 +43,7 @@ pub struct ApplicationBaseUrl<P: HKT1Unsized>(
     pub K1<P, str>,
 );
 
+#[allow(clippy::unused_async)]
 pub async fn run<P: RefHKT>(
     listener: TcpListener,
     db_pool: PgPool,
@@ -189,7 +190,7 @@ impl Application {
         .map(|server| Application { port, server })
     }
 
-    pub fn port(&self) -> u16 {
+    #[must_use] pub fn port(&self) -> u16 {
         self.port
     }
 

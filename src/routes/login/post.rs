@@ -108,7 +108,7 @@ pub async fn login(
             .map_err(eyre::Report::new)
             .map_err(lazy_errors::Error::wrap)
             .map_err(LoginError::Unexpected)
-            .map(|_| {
+            .map(|()| {
                 HttpResponse::SeeOther()
                     .insert_header((
                         LOCATION,

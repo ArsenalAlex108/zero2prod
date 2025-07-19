@@ -26,7 +26,7 @@ pub async fn get_newsletter_form(
         )
         .expect(
             "Write to string should have been successful.",
-        )
+        );
         });
 
     let idempotency_key = Uuid::new_v4();

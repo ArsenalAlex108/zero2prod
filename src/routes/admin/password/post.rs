@@ -17,6 +17,7 @@ use crate::{
 use argon2::PasswordHasher;
 
 #[derive(serde::Deserialize)]
+#[allow(clippy::struct_field_names)]
 pub struct FormData<'a> {
     pub old_password: Cow<'a, SecretString>,
     pub new_password: Cow<'a, SecretString>,
@@ -70,7 +71,7 @@ pub async fn post_reset_password(
 
         return see_other_response("/admin/reset_password")
             .pipe(Ok);
-    };
+    }
 
     if form_data.0.new_password.expose_secret()
         != form_data.0.confirm_new_password.expose_secret()
