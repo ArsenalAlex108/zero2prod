@@ -1,6 +1,7 @@
 use std::{ops::ControlFlow, time::Duration};
 
 use eyre::Context;
+use lazy_errors::{IntoEyreResult, OrStash};
 use uuid::Uuid;
 
 use crate::{
@@ -164,14 +165,14 @@ pub fn get_single_newsletter_picking_and_sending_iterator<P: SharedPointerHKT>(
         }
 
         match acquire_task(connection).await {
-            Ok(Some(record)) => {
+            Ok(Some(id)) => {
                 sqlx::query_as!(NewsletterContent,
                     "--sql
                     SELECT title, text_content, html_content
                     FROM newsletter_issues
                     WHERE newsletter_issue_id = $1
                     ",
-                    &record.newsletter_issue_id
+                    &id
                 ).fetch_one(connection)
                 .await
                 .map_err(eyre::Report::new)
@@ -193,7 +194,7 @@ pub fn get_single_newsletter_picking_and_sending_iterator<P: SharedPointerHKT>(
                         &subject,
                         &html_content,
                         &text_content,
-                        &record.newsletter_issue_id,
+                        &id,
                         email_client,
                         connection_ptr
                     );
@@ -251,44 +252,96 @@ fn get_sending_to_subscribers_of_single_newsletter_issue_iterator<
         match acquire_task(&mut connection).await
         {
             Ok(Some(record)) => {
-                if let Ok(subscriber_email) =
-                SubscriberEmail::try_from(record.subscriber_email.to_string())
-                .inspect_err(|e| tracing::warn!("Found subscriber with invalid email while attempting to send a newsletter to them: '{0}'\n
-                Error: '{e}'", &record.subscriber_email)) {
-                    match email_client
-                    .send_email(
-                        subscriber_email.pipe_ref(SubscriberEmail::clone),
-                        subject.pipe_ref(K1::clone),
-                        html_content.pipe_ref(K1::clone),
-                        text_content.pipe_ref(K1::clone),
-                    ).await
-                    {
-                        Ok(()) => {
-                            match finalize_newsletter_task(
-                                &mut connection,
-                                record
-                            ).await {
-                                Ok(()) => ControlFlow::Continue(()),
-                                Err(e) => e
-                                    .wrap_err(format!("Failed to finalize newsletter task to: '{}'", subscriber_email))
-                                    .pipe(Err)
-                                    .pipe(ControlFlow::Break),
-                            }
-                        },
-                        Err(e) => e
-                        .pipe(eyre::Report::new)
-                        .wrap_err(format!("Failed to send newsletter to: '{}'", subscriber_email))
-                        .pipe(Err)
-                        .pipe(ControlFlow::Break),
+                match SubscriberEmail::try_from(record.subscriber_email.to_string()) {
+                    Ok(subscriber_email) => {
+                        match email_client
+                                .send_email(
+                                    subscriber_email.pipe_ref(SubscriberEmail::clone),
+                                    subject.pipe_ref(K1::clone),
+                                    html_content.pipe_ref(K1::clone),
+                                    text_content.pipe_ref(K1::clone),
+                                ).await
+                                {
+                                    Ok(()) => {
+                                        match finalize_newsletter_task(
+                                            &mut connection,
+                                            record
+                                        ).await {
+                                            Ok(()) => ControlFlow::Continue(()),
+                                            Err(e) => e
+                                                .wrap_err(format!("Failed to finalize newsletter task to: '{}'", subscriber_email))
+                                                .pipe(Err)
+                                                .pipe(ControlFlow::Break),
+                                        }
+                                    },
+                                    Err(e) => {
+
+                                        let mut error_stash = lazy_errors::ErrorStash::<_, _,eyre::Report>::new(|| format!("Failed to send newsletter to: '{}'", subscriber_email));
+
+                                        schedule_task_retry(
+                                            &record,
+                                            &mut connection
+                                        ).await
+                                        .context("Failed to schedule task retry.").or_stash(&mut error_stash);
+
+                                        error_stash.push(eyre::Report::new(e));
+
+                                        error_stash
+                                        .into_eyre_result()
+                                        .pipe(ControlFlow::Break)
+                                    },
+                                }
                     }
-                } else {
-                    ControlFlow::Continue(())
+                    Err(e) => {
+                        tracing::warn!("Found subscriber with invalid email while attempting to send a newsletter to them: '{0}'\n
+                Error: '{e}'", &record.subscriber_email);
+
+                        let _ = disable_task(
+                            &record,
+                            &mut connection,
+                        ).await;
+
+                        ControlFlow::Continue(())
+                    },
                 }
             },
             Ok(None) => ControlFlow::Break(Ok(())),
             Err(e) => ControlFlow::Break(Err(e))
         }
     })
+}
+
+async fn schedule_task_retry(
+    record: &IssueDeliveryRecord,
+    connection: &mut sqlx::PgConnection,
+) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        "--sql
+        UPDATE issue_delivery_queue
+        SET n_retries = n_retries + 1,
+            execute_after = execute_after * 1.5
+        WHERE newsletter_issue_id = $1
+        ",
+        &record.newsletter_issue_id
+    )
+    .execute(connection)
+    .await
+}
+async fn disable_task(
+    record: &IssueDeliveryRecord,
+    connection: &mut sqlx::PgConnection,
+) -> Result<sqlx::postgres::PgQueryResult, sqlx::Error> {
+    sqlx::query!(
+        "--sql
+        UPDATE issue_delivery_queue
+        SET enabled = false
+        WHERE newsletter_issue_id = $1
+        AND subscriber_email = $2",
+        &record.newsletter_issue_id,
+        &record.subscriber_email
+    )
+    .execute(connection)
+    .await
 }
 
 #[tracing::instrument(
@@ -301,14 +354,15 @@ pub async fn acquire_newsletter_task_from_issue(
 ) -> Result<Option<IssueDeliveryRecord>, eyre::Report> {
     sqlx::query_as!(
         IssueDeliveryRecord,
-        "--sql
-        SELECT newsletter_issue_id, subscriber_email
-        FROM issue_delivery_queue
+        r#"--sql
+        SELECT newsletter_issue_id as "newsletter_issue_id!",
+            subscriber_email as "subscriber_email!"
+        FROM get_available_issue_delivery_queue(now())
         WHERE newsletter_issue_id = $1
         FOR UPDATE
         SKIP LOCKED
         LIMIT 1
-    ",
+    "#,
         newsletter_issue_id
     )
     .fetch_optional(connection)
@@ -322,19 +376,18 @@ pub async fn acquire_newsletter_task_from_issue(
 )]
 pub async fn acquire_newsletter_task(
     connection: &mut sqlx::PgConnection,
-) -> Result<Option<IssueDeliveryRecord>, eyre::Report> {
-    sqlx::query_as!(
-        IssueDeliveryRecord,
+) -> Result<Option<Uuid>, eyre::Report> {
+    sqlx::query!(
         "--sql
-        SELECT newsletter_issue_id, subscriber_email
-        FROM issue_delivery_queue
+        SELECT newsletter_issue_id as \"newsletter_issue_id!\"
+        FROM get_available_issue_delivery_queue(now())
         FOR UPDATE
         SKIP LOCKED
         LIMIT 1
-    "
-    )
+    ")
     .fetch_optional(connection)
     .await?
+    .map(|i| i.newsletter_issue_id)
     .pipe(Ok)
 }
 
