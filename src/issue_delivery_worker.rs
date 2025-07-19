@@ -12,8 +12,10 @@ use crate::{
         traversable::traverse_result_future,
     },
     startup::get_connection_pool,
-    utils::{Pipe as _, SyncMutCell},
+    utils::Pipe as _,
 };
+
+use tokio::sync::Mutex;
 
 pub struct IssueDeliveryRecord {
     pub newsletter_issue_id: Uuid,
@@ -51,8 +53,7 @@ pub async fn run_worker_until_stopped<
             "Transaction should begin successfully.",
         )?;
 
-    let connection_ptr =
-        SyncMutCell::from(&mut *transaction);
+    let connection_ptr = Mutex::from(&mut *transaction);
 
     let iterator = get_newsletter_sending_worker_iterator(
         &email_client,
@@ -75,7 +76,7 @@ pub async fn get_newsletter_sending_worker_iterator<
     P: SharedPointerHKT,
 >(
     email_client: &EmailClient<P>,
-    connection_ptr: &SyncMutCell<&mut sqlx::PgConnection>,
+    connection_ptr: &Mutex<&mut sqlx::PgConnection>,
 ) -> impl Iterator<Item = impl Future> {
     [()]
     .into_iter()
@@ -137,7 +138,7 @@ impl
 )]
 pub fn get_single_newsletter_picking_and_sending_iterator<P: SharedPointerHKT>(
     email_client: &EmailClient<P>,
-    connection_ptr: &SyncMutCell<&mut sqlx::PgConnection>,
+    connection_ptr: &Mutex<&mut sqlx::PgConnection>,
 ) -> impl Iterator<
     Item = impl Future<
         Output = SingleNewsletterPickingAndSendingTaskResult
@@ -151,7 +152,8 @@ pub fn get_single_newsletter_picking_and_sending_iterator<P: SharedPointerHKT>(
     .into_iter()
     .cycle()
     .map(async |acquire_task| {
-        let mut connection_borrow = connection_ptr.borrow();
+        let mut connection_borrow = connection_ptr.try_lock()
+        .expect("Mutex must be free at this point.");
 
         let connection: &mut sqlx::PgConnection = *connection_borrow;
 
@@ -184,7 +186,7 @@ pub fn get_single_newsletter_picking_and_sending_iterator<P: SharedPointerHKT>(
                     let html_content = P::from_string(html_content);
                     let text_content = P::from_string(text_content);
 
-                    // Danger
+                    // Danger: Drop required before passing mutex ref.
                     drop(connection_borrow);
 
                     let iterator = get_sending_to_subscribers_of_single_newsletter_issue_iterator(
@@ -228,7 +230,7 @@ fn get_sending_to_subscribers_of_single_newsletter_issue_iterator<
     text_content: &K1<P, str>,
     newsletter_issue_id: &Uuid,
     email_client: &EmailClient<P>,
-    connection_ptr: &SyncMutCell<&mut sqlx::PgConnection>,
+    connection_ptr: &Mutex<&mut sqlx::PgConnection>,
 ) -> impl Iterator<
     Item = impl Future<
         Output = ControlFlow<Result<(), eyre::Report>, ()>,
@@ -243,7 +245,8 @@ fn get_sending_to_subscribers_of_single_newsletter_issue_iterator<
     .into_iter()
     .cycle()
     .map(async |acquire_task| {
-        let mut connection = connection_ptr.borrow();
+        let mut connection = connection_ptr.try_lock()
+        .expect("Mutex must be free at this point.");
 
         match acquire_task(&mut connection).await
         {

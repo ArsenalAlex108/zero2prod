@@ -7,11 +7,11 @@ use secrecy::SecretString;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::ops::DerefMut;
 use std::{borrow::Cow, ops::Deref};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 use zero2prod::email_client::EmailClient;
 use zero2prod::issue_delivery_worker::SingleNewsletterPickingAndSendingTaskResult;
 use zero2prod::issue_delivery_worker::get_single_newsletter_picking_and_sending_iterator;
-use zero2prod::utils::SyncMutCell;
 use zero2prod::{
     authentication::BasicAuthCredentials,
     configuration::{
@@ -221,7 +221,7 @@ impl<P: SharedPointerHKT> TestApp<'_, P> {
         let mut connection =
             self.db_pool.begin().await.unwrap();
         let connection_ptr =
-            SyncMutCell::from(connection.deref_mut());
+            Mutex::from(connection.deref_mut());
 
         let iterator = get_single_newsletter_picking_and_sending_iterator(
             &self.email_client,
