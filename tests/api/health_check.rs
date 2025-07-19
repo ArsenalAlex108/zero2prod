@@ -1,4 +1,6 @@
-mod common;
+use std::ops::Deref;
+
+use crate::common;
 
 //`actix_rt::test`isthetestingequivalentof`actix_web::main`.
 // Italsosparesyoufromhavingtospecifythe`#[test]` attribute.
@@ -13,7 +15,14 @@ async fn health_check_works() {
     let client = reqwest::Client::new();
     //Act
     let response = client
-        .get(common::spawn_app().await.address + "/health_check")
+        .get(
+            common::spawn_app()
+                .await
+                .address
+                .deref()
+                .to_string()
+                + "/health_check",
+        )
         .send()
         .await
         .expect("Failed to execute request.");
