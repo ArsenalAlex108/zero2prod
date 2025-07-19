@@ -162,7 +162,8 @@ pub enum Environment {
     Production,
 }
 impl Environment {
-    #[must_use] pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub fn as_str(&self) -> &'static str {
         match self {
             Environment::Local => "local",
             Environment::Production => "production",

@@ -190,7 +190,8 @@ impl Application {
         .map(|server| Application { port, server })
     }
 
-    #[must_use] pub fn port(&self) -> u16 {
+    #[must_use]
+    pub fn port(&self) -> u16 {
         self.port
     }
 

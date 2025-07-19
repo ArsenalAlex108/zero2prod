@@ -55,8 +55,11 @@ pub async fn save_response(
     user_id: Uuid,
     http_response: HttpResponse,
 ) -> Result<HttpResponse, eyre::Report> {
-    let status_code =
-        http_response.status().as_u16().pipe(i16::try_from).unwrap();
+    let status_code = http_response
+        .status()
+        .as_u16()
+        .pipe(i16::try_from)
+        .unwrap();
 
     let (headers_response, body) =
         http_response.into_parts();

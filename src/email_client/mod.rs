@@ -173,8 +173,9 @@ mod tests {
 
     #[tokio::test]
     async fn send_email_sends_expected_request() {
-        send_email_sends_expected_request_generic::<RcHKT>()
-            .await;
+        send_email_sends_expected_request_generic::<RcHKT>(
+        )
+        .await;
     }
 
     async fn send_email_sends_expected_request_generic<

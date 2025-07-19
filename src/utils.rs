@@ -49,7 +49,8 @@ pub fn unpack_result_to_result_tuple<T, E>(
     }
 }
 
-#[must_use] pub fn see_other_response(
+#[must_use]
+pub fn see_other_response(
     location: &str,
 ) -> actix_web::HttpResponse {
     actix_web::HttpResponse::SeeOther()

@@ -1,7 +1,4 @@
-use std::{
-    ops::ControlFlow,
-    time::Duration,
-};
+use std::{ops::ControlFlow, time::Duration};
 
 use eyre::Context;
 use uuid::Uuid;

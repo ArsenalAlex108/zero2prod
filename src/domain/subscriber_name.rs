@@ -191,16 +191,16 @@ mod tests {
     #[test]
     fn names_containing_an_invalid_character_are_rejected()
     {
-        SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS.iter().for_each(
-            |name| {
+        SUBSCRIBE_NAME_FORBIDDEN_CHARACTERS
+            .iter()
+            .for_each(|name| {
                 let name = name.to_string();
                 assert_err!(
                     SubscriberName::<RcHKT>::parse(
                         name.into()
                     )
                 );
-            },
-        );
+            });
     }
 
     #[test]

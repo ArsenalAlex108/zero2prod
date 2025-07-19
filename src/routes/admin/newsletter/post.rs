@@ -156,12 +156,9 @@ where
     .await
     .map_err(redirect_to_self_with_err)?;
 
-    enqueue_delivery_tasks(
-        &mut *transaction,
-        issue_id,
-    )
-    .await
-    .map_err(redirect_to_self_with_err)?;
+    enqueue_delivery_tasks(&mut *transaction, issue_id)
+        .await
+        .map_err(redirect_to_self_with_err)?;
 
     save_response(
         &mut transaction,
