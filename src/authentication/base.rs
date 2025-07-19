@@ -94,7 +94,7 @@ pub fn validate_password(
             .context("Failed to parse password hash")?
             .ref_cast(),
     ) {
-        Ok(_) => Ok(true),
+        Ok(()) => Ok(true),
         Err(password_hash::Error::Password) => Ok(false),
         Err(e) => e
             .pipe(eyre::Report::new)
@@ -155,7 +155,7 @@ pub async fn authenticate_newsletter_writer(
 
     let (salted_password, user_id) = match record_result {
         Ok(t) => (Some(t.salted_password), Some(t.user_id)),
-        Err(_) => (None, None),
+        Err(()) => (None, None),
     };
 
     // Hides whether user exists.
