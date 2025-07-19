@@ -126,7 +126,7 @@ mod tests {
     use crate::hkt::RcHKT;
 
     use super::SubscriberEmail;
-    use claim::assert_err;
+    use claims::assert_err;
     use fake::Fake;
     use fake::faker::internet::en::SafeEmail;
     use kust::ScopeFunctions;

@@ -152,7 +152,7 @@ mod tests {
         },
         hkt::RcHKT,
     };
-    use claim::{assert_err, assert_ok};
+    use claims::{assert_err, assert_ok};
 
     // Does this violates DRY?
     #[test]

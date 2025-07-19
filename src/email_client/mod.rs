@@ -211,7 +211,7 @@ mod tests {
             .await;
 
         // Assert
-        claim::assert_ok!(send_result);
+        claims::assert_ok!(send_result);
     }
 
     #[tokio::test]
@@ -251,7 +251,7 @@ mod tests {
             .await;
 
         // Assert
-        claim::assert_err!(send_result);
+        claims::assert_err!(send_result);
     }
 
     #[tokio::test]
@@ -295,6 +295,6 @@ mod tests {
             .await;
 
         // Assert
-        claim::assert_err!(send_result);
+        claims::assert_err!(send_result);
     }
 }

@@ -5,7 +5,6 @@ pub mod domain;
 pub mod email_client;
 pub mod hkt;
 pub mod routes;
-pub mod serde;
 pub mod startup;
 pub mod telemetry;
 #[macro_use]

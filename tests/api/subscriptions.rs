@@ -136,7 +136,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data()
     let result =
         app.post_subscriptions(body.to_string()).await;
     // Assert
-    claim::assert_ok!(result);
+    claims::assert_ok!(result);
     // Mock asserts on drop
 }
 #[actix_rt::test]
@@ -155,7 +155,7 @@ async fn subscribe_sends_a_confirmation_email_with_a_link()
     let result =
         app.post_subscriptions(body.to_string()).await;
     // Assert
-    claim::assert_ok!(result);
+    claims::assert_ok!(result);
     // Get the first intercepted request
     let email_request = &app
         .email_server

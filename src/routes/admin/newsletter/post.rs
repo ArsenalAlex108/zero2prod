@@ -68,11 +68,7 @@ pub async fn publish_newsletter(
 ) -> Result<HttpResponse, actix_web::Error> {
     publish_newsletter_with_pointer::<
         startup::GlobalSharedPointerType,
-    >(
-        pool,
-        body.0.into(),
-        user_id.into_inner(),
-    )
+    >(pool, body.0.into(), user_id.into_inner())
     .await
 }
 
