@@ -22,6 +22,10 @@ pub mod startup;
 pub mod telemetry;
 #[macro_use]
 pub mod utils;
+pub mod database;
+pub mod dependency_injection;
 pub mod idempotency;
 pub mod issue_delivery_worker;
+pub mod services;
 pub mod session_state;
+pub mod tuples;

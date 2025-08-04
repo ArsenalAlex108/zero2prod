@@ -1,21 +1,26 @@
 use crate::{
     authentication::UserId,
-    hkt::{
-        SharedPointerHKT,
-        traversable::traverse_result_future_result,
+    database::transactional::{
+        authentication::AuthenticationRepository,
+        issue_delivery_queue::IssueDeliveryQueueRepository,
+        newsletters::NewslettersRepository,
+        persistence::{
+            HeaderPairRecord, PersistenceRepository,
+        },
+        unit_of_work::{BeginUnitOfWork, UnitOfWork as _},
     },
-    idempotency::{
-        IdempotencyKey, get_saved_response, save_response,
-    },
+    dependency_injection::app_state::Inject,
+    hkt::SharedPointerHKT,
+    idempotency::IdempotencyKey,
     startup,
     utils::{Pipe, see_other_response},
 };
-use actix_web::{HttpResponse, error::InternalError, web};
+use actix_web::{
+    HttpResponse, error::InternalError, http::StatusCode,
+    web,
+};
 use const_format::formatcp;
-use eyre::Context;
 use nameof::name_of;
-use sqlx::Executor as _;
-use sqlx::PgPool;
 use std::{
     borrow::Cow,
     fmt::{Debug, Display},
@@ -58,27 +63,77 @@ impl<'a> From<FormData<'a>> for BodyData<'a> {
 
 #[tracing::instrument(
     name = "Publishing Newsletter To Confirmed Subscribers",
-    skip(pool, body)
+    skip(
+        authentication_repository,
+        begin_unit_of_work,
+        issue_delivery_queue_repository,
+        newsletters_repository,
+        persistence_repository,
+        body
+    )
 )]
-pub async fn publish_newsletter(
-    pool: web::Data<PgPool>,
+pub async fn publish_newsletter<
+    A: AuthenticationRepository,
+    B: BeginUnitOfWork,
+    I: IssueDeliveryQueueRepository<
+        UnitOfWork = B::UnitOfWork,
+    >,
+    N: NewslettersRepository<UnitOfWork = B::UnitOfWork>,
+    Pr: PersistenceRepository<UnitOfWork = B::UnitOfWork>,
+>(
+    authentication_repository: Inject<A>,
+    begin_unit_of_work: Inject<B>,
+    issue_delivery_queue_repository: Inject<I>,
+    newsletters_repository: Inject<N>,
+    persistence_repository: Inject<Pr>,
     body: web::Form<FormData<'_>>,
     user_id: web::ReqData<UserId>,
 ) -> Result<HttpResponse, actix_web::Error> {
     publish_newsletter_with_pointer::<
         startup::GlobalSharedPointerType,
-    >(pool, body.0.into(), user_id.into_inner())
+        _,
+        _,
+        _,
+        _,
+        _,
+    >(
+        authentication_repository,
+        begin_unit_of_work,
+        issue_delivery_queue_repository,
+        newsletters_repository,
+        persistence_repository,
+        body.0.into(),
+        user_id.into_inner(),
+    )
     .await
 }
 
 #[tracing::instrument(
     name = "Publishing Newsletter To Confirmed Subscribers (Generic)",
-    skip(pool, body)
+    skip(
+        authentication_repository,
+        begin_unit_of_work,
+        issue_delivery_queue_repository,
+        newsletters_repository,
+        persistence_repository,
+        body
+    )
 )]
 async fn publish_newsletter_with_pointer<
     P: SharedPointerHKT,
+    A: AuthenticationRepository,
+    B: BeginUnitOfWork,
+    I: IssueDeliveryQueueRepository<
+        UnitOfWork = B::UnitOfWork,
+    >,
+    N: NewslettersRepository<UnitOfWork = B::UnitOfWork>,
+    Pr: PersistenceRepository<UnitOfWork = B::UnitOfWork>,
 >(
-    pool: web::Data<PgPool>,
+    authentication_repository: Inject<A>,
+    begin_unit_of_work: Inject<B>,
+    issue_delivery_queue_repository: Inject<I>,
+    newsletters_repository: Inject<N>,
+    persistence_repository: Inject<Pr>,
     body: BodyData<'_>,
     user_id: UserId,
 ) -> Result<HttpResponse, actix_web::Error>
@@ -93,17 +148,19 @@ where
         tracing::field::display(&user_id),
     );
 
-    let username = sqlx::query!("--sql
-        SELECT username
-        FROM newsletter_writers
-        WHERE user_id = $1
-        ",
-        &user_id
-    ).fetch_one(pool.as_ref())
-    .await
-    .context("Failed to find user with matching user_id in the database.")
-    .map_err(redirect_to_self_with_err)?
-    .username;
+    let username = authentication_repository
+        .get_hashed_credentials_from_user_id(user_id)
+        .await
+        .map_err(
+            actix_web::error::ErrorInternalServerError,
+        )?
+        .ok_or_else(|| {
+            actix_web::error::ErrorNotFound(
+                "User not found",
+            )
+        })
+        .map_err(redirect_to_self_with_err)?
+        .username;
 
     tracing::Span::current().record(
         name_of!(username),
@@ -120,69 +177,118 @@ where
         IdempotencyKey::try_from(idempotency_key)
             .map_err(actix_web::error::ErrorBadRequest)?;
 
-    let mut transaction = pool
-        .as_ref()
+    let mut unit_of_work = begin_unit_of_work
         .begin()
         .await
         .map_err(redirect_to_self_with_err)?;
 
-    sqlx::query!(
-        "--sql
-        SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    "
-    )
-    .execute(&mut *transaction)
-    .await
-    .map_err(redirect_to_self_with_err)?;
-
-    if let Some(saved_response) = get_saved_response(
-        &mut transaction,
-        &idempotency_key,
-        user_id,
-    )
-    .await
-    .map_err(redirect_to_self_with_err)?
+    if let Some(saved_response) = persistence_repository
+        .get_saved_response_body(
+            &mut unit_of_work,
+            &idempotency_key,
+            user_id,
+        )
+        .await
+        .map_err(|e| {
+            redirect_to_self_with_err(e.into_owned())
+        })?
     {
         success().send();
-        return Ok(saved_response);
+
+        let status_code = StatusCode::from_u16(
+            saved_response
+                .response_status_code
+                .try_into()?,
+        )
+        .map_err(|e| {
+            InternalError::from_response(
+                e,
+                HttpResponse::build(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .finish(),
+            )
+        })?;
+        let mut response = HttpResponse::build(status_code);
+        for HeaderPairRecord { name, value } in
+            saved_response.response_headers
+        {
+            response.append_header((name, value));
+        }
+        return Ok(
+            response.body(saved_response.response_body)
+        );
     }
 
-    let issue_id = insert_newsletter_issue(
-        &mut *transaction,
-        &title,
-        &content.text,
-        &content.html,
-    )
-    .await
-    .map_err(redirect_to_self_with_err)?;
-
-    enqueue_delivery_tasks(&mut *transaction, issue_id)
+    let issue_id = newsletters_repository
+        .insert_newsletter_issue(
+            &mut unit_of_work,
+            &title,
+            &content.text,
+            &content.html,
+        )
         .await
         .map_err(redirect_to_self_with_err)?;
 
-    save_response(
-        &mut transaction,
-        &idempotency_key,
-        user_id,
-        see_other_response("/admin/newsletters"),
-    )
-    .await
-    .map_err(redirect_to_self_with_err)
-    .map(async |r| {
-        Ok(())
-            .map(async |()| {
-                transaction
-                    .commit()
-                    .await
-                    .map_err(redirect_to_self_with_err)
-            })
-            .pipe(traverse_result_future_result)
-            .await
-            .inspect(|()| success().send())
-            .map(|()| r)
-    })
-    .pipe(traverse_result_future_result)
-    .await
+    issue_delivery_queue_repository
+        .enqueue_delivery_tasks(&mut unit_of_work, issue_id)
+        .await
+        .map_err(redirect_to_self_with_err)?;
+
+    let http_response =
+        see_other_response("/admin/newsletters");
+
+    let status_code = http_response.status().as_u16();
+
+    let (headers_response, body) =
+        http_response.into_parts();
+
+    let headers = headers_response
+        .headers()
+        .iter()
+        .map(|pair| {
+            let (name, value) = pair;
+            let name = name.as_str().to_owned();
+            let value = value.as_bytes().to_owned();
+            HeaderPairRecord { name, value }
+        })
+        .collect::<Vec<_>>();
+
+    let body = actix_web::body::to_bytes(body)
+        .await
+        .map_err(|e| {
+            InternalError::from_response(
+                e,
+                HttpResponse::build(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .finish(),
+            )
+        })?;
+
+    persistence_repository
+        .save_response_body(
+            &mut unit_of_work,
+            user_id,
+            &idempotency_key,
+            status_code,
+            headers,
+            body.iter().as_slice(),
+        )
+        .await
+        .map_err(redirect_to_self_with_err)?;
+
+    unit_of_work
+        .commit()
+        .await
+        .map_err(redirect_to_self_with_err)?;
+
+    success().send();
+
+    headers_response
+        .set_body(body)
+        .map_into_boxed_body()
+        .pipe(Ok)
 }
 
 pub const SUCCESS_MESSAGE: &str = "Newsletter has been successfully enqueued & \
@@ -208,53 +314,4 @@ fn redirect_to_self_with_err<
     see_other_response("/admin/newsletters").pipe(|r| {
         InternalError::from_response(cause, r).into()
     })
-}
-
-#[tracing::instrument(skip_all)]
-async fn insert_newsletter_issue(
-    transaction: &mut sqlx::PgConnection,
-    title: &str,
-    text_content: &str,
-    html_content: &str,
-) -> Result<Uuid, sqlx::Error> {
-    let newsletter_issue_id = Uuid::new_v4();
-    let query = sqlx::query!(
-        "--sql
-        INSERT INTO newsletter_issues (
-            newsletter_issue_id,
-            title,
-            text_content,
-            html_content,
-            published_at
-        )
-        VALUES ($1, $2, $3, $4, now())
-        ",
-        newsletter_issue_id,
-        title,
-        text_content,
-        html_content
-    );
-    transaction.execute(query).await?;
-    Ok(newsletter_issue_id)
-}
-
-#[tracing::instrument(skip_all)]
-async fn enqueue_delivery_tasks(
-    transaction: &mut sqlx::PgConnection,
-    newsletter_issue_id: Uuid,
-) -> Result<(), sqlx::Error> {
-    let query = sqlx::query!(
-        "--sql
-        INSERT INTO issue_delivery_queue (
-            newsletter_issue_id,
-            subscriber_email
-        )
-        SELECT $1, email
-        FROM subscriptions
-        WHERE status = 'confirmed'
-        ",
-        newsletter_issue_id,
-    );
-    transaction.execute(query).await?;
-    Ok(())
 }

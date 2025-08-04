@@ -1,7 +1,15 @@
 use uuid::Uuid;
 use zero2prod::utils::Pipe;
 
-use crate::common::{self, TestApp, email_server};
+use crate::common::{
+    self, TestApp, email_server,
+    test_dependency_injection::test_database::{
+        get_subscriptions_repository::{
+            GetSubscriptionsRepository, SubscriptionStatus,
+        },
+        repository_suspender::RepositorySuspender,
+    },
+};
 
 #[actix_rt::test]
 async fn confirm_without_subscription_token_returns_400() {
@@ -136,16 +144,19 @@ async fn subscription_link_updates_status_to_confirmed() {
             .await
             .expect("Text link must be callable");
 
-    let record = sqlx::query!(
-        "SELECT email, name, status FROM subscriptions"
-    )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Query is successful");
+    let record = app
+        .test_app_state
+        .get_subscriptions_repository
+        .get_subscriptions("le guin")
+        .await
+        .expect("Query is successful");
 
     assert_eq!(record.email, "ursula_le_guin@gmail.com");
     assert_eq!(record.name, "le guin");
-    assert_eq!(record.status, "confirmed");
+    assert_eq!(
+        record.status,
+        SubscriptionStatus::Confirmed
+    );
 }
 
 #[actix_rt::test]
@@ -198,13 +209,11 @@ async fn confirm_subscription_token_returns_500_with_fatal_database_error()
     .mount(&app.email_server)
     .await;
 
-    sqlx::query!(
-        "--sql
-    DROP SCHEMA public CASCADE"
-    )
-    .execute(&app.db_pool)
-    .await
-    .unwrap();
+    app.test_app_state
+        .repository_suspender
+        .suspend()
+        .await
+        .unwrap();
 
     let token = Uuid::new_v4();
     let response = client

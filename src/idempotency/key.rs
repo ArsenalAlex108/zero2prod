@@ -8,6 +8,7 @@ use crate::utils::Pipe;
     derive_more::Into,
     derive_more::AsRef,
     derive_more::Deref,
+    derive_more::Display,
 )]
 #[as_ref(forward)]
 #[deref(forward)]
@@ -34,7 +35,7 @@ impl<'a> TryFrom<Cow<'a, str>> for IdempotencyKey<'a> {
 }
 
 impl IdempotencyKey<'_> {
-    pub fn into_owned<'b>(self) -> IdempotencyKey<'b> {
+    pub fn into_owned(self) -> IdempotencyKey<'static> {
         IdempotencyKey(
             self.0.into_owned().pipe(Cow::<str>::from),
         )

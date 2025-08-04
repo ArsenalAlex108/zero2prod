@@ -10,6 +10,8 @@ use sqlx::PgPool;
 use crate::authentication;
 use crate::authentication::BasicAuthCredentials;
 use crate::authentication::NewsletterWritersAuthenticationError;
+use crate::database::transactional::authentication::AuthenticationRepository;
+use crate::dependency_injection::app_state::Inject;
 use crate::session_state::TypedSession;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -71,10 +73,10 @@ impl actix_web::ResponseError for LoginError {
 
 #[tracing::instrument(
     name = "Handling POST login request.",
-    skip(pool, form, session)
+    skip(authentication_repository, form, session)
 )]
-pub async fn login(
-    pool: web::Data<PgPool>,
+pub async fn login<A: AuthenticationRepository>(
+    authentication_repository: Inject<A>,
     form: web::Form<LoginFormData<'_>>,
     session: TypedSession,
 ) -> Result<
@@ -92,7 +94,7 @@ pub async fn login(
     );
 
     authentication::authenticate_newsletter_writer(
-        pool.as_ref(),
+        &*authentication_repository,
         credentials,
     )
     .await

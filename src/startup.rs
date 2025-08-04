@@ -1,4 +1,4 @@
-use std::net::TcpListener;
+use std::{net::TcpListener, sync::Arc};
 
 use actix_session::{
     SessionMiddleware, storage::CookieSessionStore,
@@ -8,19 +8,20 @@ use actix_web::{
     dev::Server,
     web::{self},
 };
+
 use reqwest::Client;
 use secrecy::SecretString;
-use sqlx::{PgPool, postgres::PgPoolOptions};
 use tracing_actix_web::TracingLogger;
 
 use crate::{
     authentication::reject_anonymous_users,
-    configuration::{
-        DatabaseSettings, HmacSecret, Settings,
+    configuration::{HmacSecret, Settings},
+    dependency_injection::app_state::{
+        AppState, AppStateFactory, AppStateTypes, Inject,
     },
-    email_client::EmailClient,
     hkt::{
-        ArcHKT, HKT1Unsized, K1, RefHKT, SharedPointerHKT,
+        ArcHKT, HKT1Unsized, K1, RefHKT, SendHKT,
+        SharedPointerHKT, SyncHKT,
     },
     routes::{
         admin_dashboard, confirm_subscription_token,
@@ -28,11 +29,13 @@ use crate::{
         health_check, home, login, login_form, logout,
         post_reset_password, publish_newsletter, subscribe,
     },
+    tuples::{LifterMut, ThinDataHKT, TupleMap9},
     utils::Pipe,
 };
 use secrecy::ExposeSecret;
 
 pub type GlobalSharedPointerType = ArcHKT;
+pub type GlobalSharedPointer<T> = Arc<T>;
 
 pub struct Application {
     port: u16,
@@ -43,27 +46,24 @@ pub struct ApplicationBaseUrl<P: HKT1Unsized>(
     pub K1<P, str>,
 );
 
+impl<P: SharedPointerHKT> Clone for ApplicationBaseUrl<P> {
+    fn clone(&self) -> Self {
+        ApplicationBaseUrl(self.0.clone())
+    }
+}
+
 #[allow(clippy::unused_async)]
-pub async fn run<P: RefHKT>(
+pub async fn run<
+    P: RefHKT + SendHKT + SyncHKT,
+    A: AppStateTypes,
+>(
     listener: TcpListener,
-    db_pool: PgPool,
-    email_client: EmailClient<P>,
-    // Cow<'_, str> can be alternative using into_owned() (clone at most once).
-    // But String is more honest at that point
-    // Arc-like can be shared accross threads without cloning at the cost of intial memory allocation.
-    base_url: K1<P, str>,
     hmac_secret: HmacSecret<P>,
-) -> Result<Server, eyre::Report>
-where
-    P::T<Client>: Send + Sync,
-    P::T<str>: Send + Sync,
-    P::T<SecretString>: Send + Sync,
-{
-    let db_pool = db_pool.pipe(web::Data::new);
-    let email_client = email_client.pipe(web::Data::new);
-    let base_url = base_url
-        .pipe(ApplicationBaseUrl)
-        .pipe(web::Data::new);
+    configurer: impl FnMut(&mut web::ServiceConfig)
+    + Send
+    + 'static
+    + Clone,
+) -> Result<Server, eyre::Report> {
     let hmac_secret = hmac_secret.pipe(web::Data::new);
 
     let hmac_key = actix_web::cookie::Key::try_from(
@@ -94,18 +94,30 @@ where
             .wrap(TracingLogger::default())
             .route("/", web::get().to(home))
             .route("/login", web::get().to(login_form))
-            .route("/login", web::post().to(login))
+            .route(
+                "/login",
+                web::post().to(login::<
+                    A::AuthenticationRepository,
+                >),
+            )
             .route(
                 "/health_check",
                 web::get().to(health_check),
             )
             .route(
                 "/subscriptions",
-                web::post().to(subscribe),
+                web::post().to(subscribe::<
+                    A::BeginUnitOfWork,
+                    A::SubscriptionsRepository,
+                >),
             )
             .route(
                 "/subscriptions/confirm",
-                web::get().to(confirm_subscription_token),
+                web::get().to(
+                    confirm_subscription_token::<
+                        A::SubscriptionsConfirmRepository,
+                    >,
+                ),
             )
             .service(
                 web::scope("/admin")
@@ -114,7 +126,9 @@ where
                     ))
                     .route(
                         "/dashboard",
-                        web::get().to(admin_dashboard),
+                        web::get().to(admin_dashboard::<
+                            A::AuthenticationRepository,
+                        >),
                     )
                     .route(
                         "/reset_password",
@@ -123,7 +137,11 @@ where
                     )
                     .route(
                         "/reset_password",
-                        web::post().to(post_reset_password),
+                        web::post().to(
+                            post_reset_password::<
+                                A::AuthenticationRepository,
+                            >,
+                        ),
                     )
                     .route(
                         "/logout",
@@ -131,60 +149,129 @@ where
                     )
                     .route(
                         "/newsletters",
-                        web::post().to(publish_newsletter),
+                        web::post()
+                            .to(publish_newsletter::<
+                            A::AuthenticationRepository,
+                            A::BeginUnitOfWork,
+                            A::IssueDeliveryQueueRepository,
+                            A::NewslettersRepository,
+                            A::PersistenceRepository,
+                        >),
                     )
                     .route(
                         "/newsletters",
                         web::get().to(get_newsletter_form),
                     ),
             )
-            .app_data(db_pool.clone())
-            .app_data(email_client.clone())
-            .app_data(base_url.clone())
-            .app_data(hmac_secret.clone())
+            .configure(configurer.clone())
     })
     .listen(listener)?
     .run();
     Ok(server)
 }
 
-impl Application {
-    pub async fn build<P: SharedPointerHKT>(
-        configuration: &Settings<P>,
-    ) -> Result<Application, eyre::Report>
-    where
-        P::T<Client>: Send + Sync,
-        P::T<str>: Send + Sync,
-        P::T<SecretString>: Send + Sync,
-    {
-        let connection_pool =
-            get_connection_pool(&configuration.database);
+impl<T> actix_web::FromRequest for Inject<T>
+where
+    T: 'static + Send + Sync,
+{
+    type Error = actix_web::Error;
+    type Future =
+        std::future::Ready<Result<Self, Self::Error>>;
 
+    fn from_request(
+        req: &actix_web::HttpRequest,
+        _: &mut actix_web::dev::Payload,
+    ) -> Self::Future {
+        let data = req
+            .app_data::<web::ThinData<GlobalSharedPointer<T>>>()
+            .cloned()
+            .ok_or_else(|| {
+                actix_web::error::ErrorInternalServerError(
+                    "AppState not found",
+                )
+            })
+            .map(Inject::new);
+        std::future::ready(data)
+    }
+}
+
+impl Application {
+    pub async fn build<
+        P: SharedPointerHKT + SendHKT + SyncHKT,
+        A: AppStateFactory,
+    >(
+        configuration: &Settings<P>,
+    ) -> Result<Application, eyre::Report> {
+        Self::build_with::<P, A::AppStateTypes>(
+            configuration,
+            A::build(configuration),
+        )
+        .await
+    }
+
+    pub async fn build_with<
+        P: SharedPointerHKT + SendHKT + SyncHKT,
+        A: AppStateTypes,
+    >(
+        configuration: &Settings<P>,
+        app_state: AppState<A>,
+    ) -> Result<Application, eyre::Report> {
         let email_client = configuration
             .email_client
             .as_ref()
             .clone()
             .client();
 
+        let email_client = web::Data::new(email_client);
+
+        let configuration = configuration.clone();
+
         let address = format!(
             "{}:{}",
-            configuration.application.host,
-            configuration.application.port
+            &configuration.application.host,
+            &configuration.application.port
         );
 
         let listener = TcpListener::bind(&address)?;
         let port = listener.local_addr().unwrap().port();
 
-        run::<P>(
+        let app_state = app_state
+            .into_tuple()
+            .lift_map::<ThinDataHKT>();
+
+        struct Cfg<'a>(&'a mut web::ServiceConfig);
+
+        impl LifterMut<'static> for Cfg<'_> {
+            fn lift<T: 'static>(
+                &mut self,
+                t: T,
+            ) -> Self::T<T> {
+                self.0.app_data(t);
+            }
+
+            type T<A: 'static> = ();
+        }
+
+        run::<P, A>(
             listener,
-            connection_pool,
-            email_client,
-            configuration.application.base_url.clone(),
             configuration
                 .application
                 .hmac_secret
                 .as_ref()
                 .clone(),
+            move |cfg| {
+                app_state.clone().map_mut(&mut Cfg(cfg));
+                cfg.app_data(email_client.clone())
+                    .app_data(
+                        ApplicationBaseUrl(
+                            configuration
+                                .application
+                                .base_url
+                                .clone(),
+                        )
+                        .pipe(web::ThinData),
+                    );
+            },
         )
         .await
         .map(|server| Application { port, server })
@@ -200,12 +287,4 @@ impl Application {
     ) -> std::io::Result<()> {
         self.server.await
     }
-}
-
-pub fn get_connection_pool<P: RefHKT>(
-    configuration: &DatabaseSettings<P>,
-) -> PgPool {
-    PgPoolOptions::new()
-        .idle_timeout(std::time::Duration::from_secs(2))
-        .connect_lazy_with(configuration.with_db())
 }

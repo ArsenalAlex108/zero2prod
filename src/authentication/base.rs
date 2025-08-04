@@ -1,7 +1,9 @@
 use std::borrow::Cow;
 
 use crate::{
-    authentication, telemetry,
+    authentication,
+    database::transactional::authentication::AuthenticationRepository,
+    telemetry,
     utils::{self, Pipe},
 };
 use argon2::{
@@ -11,7 +13,6 @@ use base64::Engine;
 use eyre::eyre;
 use eyre::{ContextCompat, WrapErr};
 use secrecy::{ExposeSecret, SecretString};
-use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -126,26 +127,28 @@ impl From<NewsletterWritersAuthenticationError>
 
 #[tracing::instrument(
     name = "Authenticating Newsletter Writer",
-    skip(pool, credentials)
+    skip_all
 )]
-pub async fn authenticate_newsletter_writer(
-    pool: &PgPool,
+pub async fn authenticate_newsletter_writer<
+    A: AuthenticationRepository,
+>(
+    authentication_repository: &A,
     credentials: BasicAuthCredentials<'_>,
 ) -> Result<Uuid, NewsletterWritersAuthenticationError> {
-    let query_result = sqlx::query!("--sql
-        SELECT user_id, salted_password
-        FROM newsletter_writers
-        WHERE username = $1",
-        &credentials.username)
-    .fetch_one(pool)
+    let query_result = match authentication_repository.get_hashed_credentials_from_username(
+        &credentials.username,
+    )
     .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => NewsletterWritersAuthenticationError::Authentication(eyre!("Username not found.").pipe(lazy_errors::Error::wrap)),
-        e => NewsletterWritersAuthenticationError::Unexpected(e
+    {
+        Ok(Some(record)) => Ok(record),
+        Ok(None) => Err(NewsletterWritersAuthenticationError::Authentication(
+            eyre!("Username not found.").pipe(lazy_errors::Error::wrap),
+        )),
+        Err(e) => NewsletterWritersAuthenticationError::Unexpected(e
             .pipe(eyre::Report::new)
             .pipe(lazy_errors::Error::wrap)
-        )
-    });
+        ).pipe(Err),
+    };
 
     let credentials = credentials.clone_owned();
     let raw_password = credentials.raw_password;
@@ -162,15 +165,13 @@ pub async fn authenticate_newsletter_writer(
     let salted_password = salted_password
     .unwrap_or_else(|| "$argon2id$v=19$m=15000,t=2,p=1$\
                             gZiV/M1gPc22ElAH/Jh1Hw$\
-                            CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno".to_string());
+                            CWOrkoo7oJBQ/iyh7uJ0LO2aLEfrHwTWllSAxT0zRno".pipe(SecretString::from));
 
     let validation_result =
         telemetry::spawn_blocking_with_tracing(move || {
             authentication::validate_password(
                 &raw_password,
-                &salted_password
-                    .pipe(Box::<str>::from)
-                    .pipe(SecretString::new),
+                &salted_password,
             )
         })
         .await;

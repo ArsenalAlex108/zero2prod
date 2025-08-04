@@ -9,7 +9,17 @@ use std::ops::DerefMut;
 use std::{borrow::Cow, ops::Deref};
 use tokio::sync::Mutex;
 use uuid::Uuid;
+use zero2prod::database::transactional::unit_of_work::BeginUnitOfWork as _;
+use zero2prod::dependency_injection::app_state::AppState;
+use zero2prod::dependency_injection::app_state::AppStateFactory;
+use zero2prod::dependency_injection::app_state::AppStateTypes;
+use zero2prod::dependency_injection::app_state::DefaultAppStateFactory;
+use zero2prod::dependency_injection::app_state::DefaultAppStateTypes;
+use zero2prod::dependency_injection::app_state::IssueDeliveryWorkerTypes;
 use zero2prod::email_client::EmailClient;
+use zero2prod::hkt::SendHKT;
+use zero2prod::hkt::SyncHKT;
+use zero2prod::issue_delivery_worker::IssueDeliveryWorkerDependencies;
 use zero2prod::issue_delivery_worker::SingleNewsletterPickingAndSendingTaskResult;
 use zero2prod::issue_delivery_worker::get_single_newsletter_picking_and_sending_iterator;
 use zero2prod::{
@@ -29,19 +39,32 @@ use argon2::{
 
 use anyhow::anyhow;
 
+use crate::common::test_dependency_injection::test_app_state;
+use crate::common::test_dependency_injection::test_app_state::get_test_app_state;
+use crate::common::test_dependency_injection::test_app_state::TestAppState;
+use crate::common::test_dependency_injection::test_app_state::TestAppStateFactory;
+use crate::common::test_dependency_injection::test_app_state::TestAppStateFactoryImpl;
+use crate::common::test_dependency_injection::test_app_state::TestAppStateTypes;
+use crate::common::test_dependency_injection::test_app_state::TestAppTypesImpl;
+use crate::common::test_dependency_injection::test_database::insert_newsletter_writer_repository::InsertNewsletterWriterRepository as _;
+
+pub mod email_server;
+pub mod test_dependency_injection;
+
 pub struct TestApp<
     'a,
     P: RefHKT = startup::GlobalSharedPointerType,
+    A: AppStateTypes = DefaultAppStateTypes,
+    TA: TestAppStateTypes = TestAppTypesImpl,
 > {
     pub address: Cow<'a, str>,
-    pub db_pool: PgPool,
     pub email_server: wiremock::MockServer,
     pub port: u16,
     pub http_client: reqwest::Client,
     pub email_client: EmailClient<P>,
+    pub app_state: AppState<A>,
+    pub test_app_state: TestAppState<TA>,
 }
-
-pub mod email_server;
 
 impl<P: RefHKT> TestApp<'_, P> {
     pub async fn post_subscriptions(
@@ -216,16 +239,30 @@ impl<P: RefHKT> TestApp<'_, P> {
     }
 }
 
-impl<P: SharedPointerHKT> TestApp<'_, P> {
+impl<
+    P: SharedPointerHKT + SendHKT + SyncHKT,
+    A: AppStateTypes,
+> TestApp<'_, P, A>
+{
     pub async fn dispatch_all_pending_emails(&self) {
-        let mut connection =
-            self.db_pool.begin().await.unwrap();
-        let connection_ptr =
-            Mutex::from(connection.deref_mut());
+        let dependencies =
+            IssueDeliveryWorkerDependencies::<
+                IssueDeliveryWorkerTypes<P, A>,
+            > {
+                issue_delivery_queue_repository: &self
+                    .app_state
+                    .issue_delivery_queue_repository,
+                begin_unit_of_work: &self
+                    .app_state
+                    .begin_unit_of_work,
+                newsletters_repository: &self
+                    .app_state
+                    .newsletters_repository,
+                email_client: &self.email_client,
+            };
 
         let iterator = get_single_newsletter_picking_and_sending_iterator(
-            &self.email_client,
-            &connection_ptr
+            &dependencies,
         );
 
         for task in iterator {
@@ -265,17 +302,21 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 /// and returns its address(i.e.http://localhost:XXXX)
 pub async fn spawn_app<'a>()
 -> TestApp<'a, startup::GlobalSharedPointerType> {
-    spawn_app_generic::<startup::GlobalSharedPointerType>()
-        .await
+    spawn_app_generic::<
+        startup::GlobalSharedPointerType,
+        DefaultAppStateFactory,
+        TestAppStateFactoryImpl,
+    >()
+    .await
 }
 
-pub async fn spawn_app_generic<'a, P: SharedPointerHKT>()
--> TestApp<'a, P>
-where
-    P::T<str>: Send + Sync,
-    P::T<Client>: Send + Sync,
-    P::T<SecretString>: Send + Sync,
-{
+pub async fn spawn_app_generic<
+    'a,
+    P: SharedPointerHKT + SendHKT + SyncHKT,
+    A: AppStateFactory,
+    TA: TestAppStateFactory<AppStateTypes = A::AppStateTypes>,
+>()
+-> TestApp<'a, P, A::AppStateTypes, TA::TestAppStateTypes> {
     Lazy::force(&TRACING);
 
     let configuration = get_configuration::<P>()
@@ -321,9 +362,14 @@ where
 
     configure_database(&configuration.database).await;
 
-    let application = Application::build(&configuration)
-        .await
-        .expect("Application should build successfully.");
+    let app_state = A::build(&configuration);
+
+    let application = Application::build_with(
+        &configuration,
+        app_state.clone(),
+    )
+    .await
+    .expect("Application should build successfully.");
     // Get the port before spawning the application
     let address =
         format!("http://127.0.0.1:{}", application.port());
@@ -340,11 +386,10 @@ where
         .build()
         .expect("reqwest ClientBuilder is valid.");
 
+    let test_app_state = TA::build(&app_state);
+
     TestApp {
         address: address.into(),
-        db_pool: startup::get_connection_pool(
-            &configuration.database,
-        ),
         email_server,
         port,
         http_client,
@@ -353,6 +398,8 @@ where
             .as_ref()
             .clone()
             .client(),
+        app_state,
+        test_app_state,
     }
 }
 
@@ -424,19 +471,19 @@ pub async fn create_test_newsletter_writer(
     );
     let hash = hash.serialize();
     let hash = hash.as_str();
+    let hash = hash.pipe(SecretString::from);
 
     let user_id = Uuid::new_v4();
 
-    sqlx::query!("--sql
-        INSERT INTO newsletter_writers (user_id, username, salted_password) 
-        VALUES ($1, $2, $3)",
-        user_id,
-        test_newsletter_writer.username.as_ref(),
-        hash,
-    )
-    .execute(&app.db_pool)
-    .await
-    .unwrap();
+    app.test_app_state
+        .insert_newsletter_writer_repository
+        .insert(
+            user_id,
+            test_newsletter_writer.username.as_ref(),
+            &hash,
+        )
+        .await
+        .expect("Inserting test user should succeed.");
 }
 
 pub fn hash_password<'a>(

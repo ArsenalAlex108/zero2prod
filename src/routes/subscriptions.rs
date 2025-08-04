@@ -1,11 +1,16 @@
 use crate::{
+    database::transactional::{
+        subscriptions::SubscriptionsRepository,
+        unit_of_work::{BeginUnitOfWork, UnitOfWork as _},
+    },
+    dependency_injection::app_state::Inject,
     domain::{
         NewSubscriber, NewSubscriberParseError,
         SubscriberEmail,
     },
     email_client::EmailClient,
     hkt::{
-        RefHKT, SharedPointerHKT,
+        RefHKT, SendHKT, SharedPointerHKT, SyncHKT,
         traversable::traverse_result_future_result,
     },
     startup::{self, ApplicationBaseUrl},
@@ -16,13 +21,9 @@ use actix_web::{
     http::StatusCode,
     web::{self},
 };
-use chrono::Utc;
 use const_format::formatcp;
 use eyre::WrapErr;
-use nameof::name_of;
-use sqlx::PgPool;
 use std::ops::Deref;
-use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
 pub struct SubscribeFormData {
@@ -31,33 +32,39 @@ pub struct SubscribeFormData {
 }
 
 const SUBSCRIBE_INSTRUMENT_NAME: &str =
-    formatcp!("Enter Route '{}':", name_of!(subscribe));
+    formatcp!("Enter Route '{}':", "subscribe");
 
 #[tracing::instrument(
     name = SUBSCRIBE_INSTRUMENT_NAME,
-    skip(form, pool, email_client, base_url),
+    skip(form, email_client, base_url, begin_unit_of_work,
+        subscriptions_repository),
     fields(
         subscriber_email = %form.email,
         subscriber_name = %form.name
     )
 )]
-pub async fn subscribe(
+pub async fn subscribe<
+    B: BeginUnitOfWork,
+    S: SubscriptionsRepository<UnitOfWork = B::UnitOfWork>,
+>(
     form: web::Form<SubscribeFormData>,
-    pool: web::Data<PgPool>,
     email_client: web::Data<
         EmailClient<startup::GlobalSharedPointerType>,
     >,
-    base_url: web::Data<
+    base_url: web::ThinData<
         ApplicationBaseUrl<
             startup::GlobalSharedPointerType,
         >,
     >,
+    begin_unit_of_work: Inject<B>,
+    subscriptions_repository: Inject<S>,
 ) -> impl Responder {
     subscribe_with_shared_pointer(
         form,
-        pool,
         email_client,
-        base_url,
+        &base_url,
+        &*begin_unit_of_work,
+        &*subscriptions_repository,
     )
     .pipe(Box::pin)
     .await
@@ -65,39 +72,43 @@ pub async fn subscribe(
 
 #[tracing::instrument(
     name = SUBSCRIBE_INSTRUMENT_NAME,
-    skip(form, pool, email_client, base_url),
+    skip(form, email_client, base_url, begin_unit_of_work,
+        subscriptions_repository),
     fields(
         subscriber_email = %form.email,
         subscriber_name = %form.name
     )
 )]
 pub async fn subscribe_with_shared_pointer<
-    P: SharedPointerHKT,
+    P: SharedPointerHKT + SendHKT + SyncHKT,
     DataP: RefHKT,
+    B: BeginUnitOfWork,
+    S: SubscriptionsRepository<UnitOfWork = B::UnitOfWork>,
 >(
     form: web::Form<SubscribeFormData>,
-    pool: web::Data<PgPool>,
     email_client: web::Data<EmailClient<P>>,
-    base_url: web::Data<ApplicationBaseUrl<DataP>>,
+    base_url: &ApplicationBaseUrl<DataP>,
+    begin_unit_of_work: &B,
+    subscriptions_repository: &S,
 ) -> Result<HttpResponse, SubscribeError> {
-    pool.begin()
+    begin_unit_of_work.begin()
         .await
         .context("Failed to acquire Postgres connection from pool.")
         .map_err(SubscribeError::from)
-        .map(async |mut transaction| {
+        .map(async |mut unit_of_work| {
             NewSubscriber::try_from(form.0)
                 .map_err(SubscribeError::from)
                 .map(async |subscriber| {
-                    insert_subscriber::<P>(
+                    subscriptions_repository.insert_subscriber::<P>(
+                        &mut unit_of_work,
                         &subscriber,
-                        &mut *transaction,
                     )
                     .await
                     .context("Failed to insert new subscriber to database.")
                     .map_err(SubscribeError::from)
                     .map(async |subscriber_id| {
-                        store_token::<P>(
-                            &mut *transaction,
+                        subscriptions_repository.store_token::<P>(
+                            &mut unit_of_work,
                             &subscriber_id,
                         )
                         .await
@@ -127,7 +138,7 @@ pub async fn subscribe_with_shared_pointer<
                 .pipe(traverse_result_future_result)
                 .await
                 .map(async |()| {
-                    transaction
+                    unit_of_work
                         .commit()
                         .await
                         .context("Failed to commit new subscription transaction.")
@@ -209,68 +220,4 @@ impl actix_web::ResponseError for SubscribeError {
             }
         }
     }
-}
-
-const INSERT_SUBSCRIBER_INSTRUMENT_NAME: &str = formatcp!(
-    "Enter Route '{}':",
-    stringify!(insert_subscriber)
-);
-
-#[derive(Debug, thiserror::Error)]
-#[error(
-    "Database error occurred trying to insert subscriber."
-)]
-pub struct InsertSubscriberError(#[from] sqlx::Error);
-
-#[tracing::instrument(
-    name = INSERT_SUBSCRIBER_INSTRUMENT_NAME,
-    skip(form, connection)
-)]
-pub async fn insert_subscriber<P: SharedPointerHKT>(
-    form: &NewSubscriber<P>,
-    connection: &mut sqlx::PgConnection,
-) -> Result<Uuid, InsertSubscriberError> {
-    let subscriber_id = Uuid::new_v4();
-    sqlx::query!(
-        r#"--sql
-        INSERT INTO subscriptions (id, email, name, subscribed_at, status)
-        VALUES ($1, $2, $3, $4, 'pending_confirmation')
-        "#,
-        subscriber_id,
-        &*form.email,
-        &*form.name,
-        Utc::now()
-    )
-    .execute(connection)
-    .await?;
-    Ok(subscriber_id)
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error(
-    "Database error occurred trying to store subscription token."
-)]
-pub struct StoreTokenError(#[from] sqlx::Error);
-
-// There are two instances of Uuid here, possible mix up.
-#[tracing::instrument(
-    name = "Storing subscription confirmation token.",
-    skip(connection, subscriber_id)
-)]
-pub async fn store_token<P: SharedPointerHKT>(
-    connection: &mut sqlx::PgConnection,
-    subscriber_id: &Uuid,
-) -> Result<Uuid, StoreTokenError> {
-    let token = Uuid::new_v4();
-    sqlx::query!(
-        r#"--sql
-        INSERT INTO subscription_tokens (id, subscriber_id)
-        VALUES ($1, $2)
-        "#,
-        token,
-        subscriber_id,
-    )
-    .execute(connection)
-    .await?;
-    Ok(token)
 }

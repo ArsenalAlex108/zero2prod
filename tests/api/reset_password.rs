@@ -1,6 +1,10 @@
 use secrecy::{ExposeSecret, SecretString};
 use uuid::Uuid;
-use zero2prod::{authentication, utils::Pipe};
+use zero2prod::{
+    authentication,
+    database::transactional::authentication::AuthenticationRepository,
+    utils::Pipe,
+};
 
 use crate::common::{
     self, assert_is_redirect_to,
@@ -233,17 +237,15 @@ async fn reset_password_persists_new_password_to_database_after_success()
     .await
     .expect("This should always return a response.");
 
-    let new_password_hash = sqlx::query!("--sql
-    SELECT salted_password
-    FROM newsletter_writers
-    WHERE username = $1",
-    test_user.username.as_ref()
+    let new_password_hash = app.app_state
+    .authentication_repository
+    .get_hashed_credentials_from_username(
+        &test_user.username,
     )
-    .fetch_one(&app.db_pool)
     .await
     .expect("Fetching test user from database should be successful.")
-    .salted_password
-    .pipe(SecretString::from);
+    .expect("Test user should exist in database.")
+    .salted_password;
 
     let new_password =
         new_password.pipe(SecretString::from);

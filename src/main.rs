@@ -1,5 +1,9 @@
 use secrecy::SecretString;
-use std::fmt::{Debug, Display};
+use std::{
+    convert::Infallible,
+    fmt::{Debug, Display},
+    marker::PhantomData,
+};
 use tokio::task::JoinError;
 
 use reqwest::Client;
@@ -8,8 +12,14 @@ use zero2prod::{
         ApplicationSettings, DatabaseSettings,
         EmailClientSettings, get_configuration,
     },
-    hkt::SharedPointerHKT,
-    issue_delivery_worker,
+    dependency_injection::app_state::{
+        AppStateFactory, AppStateTypes,
+        DefaultAppStateFactory, IssueDeliveryWorkerTypes,
+    },
+    hkt::{SendHKT, SharedPointerHKT, SyncHKT},
+    issue_delivery_worker::{
+        self, IssueDeliveryWorkerDependencyAlias,
+    },
     startup::{self, Application},
     telemetry::{get_subscriber, init_subscriber},
     utils::Pipe,
@@ -19,11 +29,17 @@ pub const INFO: &str = "info";
 
 #[actix_web::main]
 async fn main() -> Result<(), eyre::Report> {
-    main_generic::<startup::GlobalSharedPointerType>().await
+    main_generic::<
+        startup::GlobalSharedPointerType,
+        DefaultAppStateFactory,
+    >()
+    .await
 }
 
-async fn main_generic<P: SharedPointerHKT>()
--> Result<(), eyre::Report>
+async fn main_generic<
+    P: SharedPointerHKT + SendHKT + SyncHKT,
+    A: AppStateFactory,
+>() -> Result<(), eyre::Report>
 where
     P::T<str>: Send + Sync,
     P::T<Client>: Send + Sync,
@@ -42,7 +58,13 @@ where
     let configuration = get_configuration::<P>()
         .expect("Failed to find configuration file.");
 
-    let application = Application::build(&configuration)
+    let app_state = A::build(&configuration);
+
+    let application =
+        Application::build_with::<P, A::AppStateTypes>(
+            &configuration,
+            app_state.clone(),
+        )
         .await?
         .run_until_stopped()
         .pipe(tokio::spawn);
@@ -50,7 +72,14 @@ where
     // .context("Application should run successfully.")
 
     let worker =
-        issue_delivery_worker::run_worker_until_stopped(
+        issue_delivery_worker::run_worker_until_stopped::<
+            IssueDeliveryWorkerTypes<P, A::AppStateTypes>,
+        >(
+            app_state
+                .issue_delivery_queue_repository
+                .clone(),
+            app_state.begin_unit_of_work.clone(),
+            app_state.newsletters_repository.clone(),
             configuration,
         )
         .pipe(tokio::spawn);

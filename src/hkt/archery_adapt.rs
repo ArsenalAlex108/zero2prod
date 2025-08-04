@@ -60,6 +60,11 @@ pub trait Infallible:
 {
 }
 
+impl<T: Sized + std::fmt::Debug + 'static + Eq + Ord>
+    Infallible for T
+{
+}
+
 pub trait HKT1Unsized: Infallible {
     type T<A: ?Sized>;
 }
@@ -100,6 +105,17 @@ pub trait SharedPointerHKT: RefHKT {
     -> usize;
     fn clone<T: ?Sized>(value: &Self::T<T>) -> K1<Self, T>;
 }
+
+pub trait SendHKT: HKT1Unsized {}
+pub trait SyncHKT: HKT1Unsized {}
+
+impl SendHKT for ArcHKT {}
+
+impl SyncHKT for ArcHKT {}
+
+unsafe impl<P: SendHKT, A: ?Sized> Send for K1<P, A> {}
+
+unsafe impl<P: SyncHKT, A: ?Sized> Sync for K1<P, A> {}
 
 // // pub struct SharedPointer<T>(T);
 
@@ -383,8 +399,6 @@ impl<'de, P: RefHKT> serde::de::Deserialize<'de>
     }
 }
 
-impl Infallible for ArcHKT {}
-
 impl HKT1 for ArcHKT {
     type T<A> = Arc<A>;
 }
@@ -449,8 +463,6 @@ impl HKT1 for RcHKT {
     type T<A> = Rc<A>;
 }
 
-impl Infallible for RcHKT {}
-
 impl hkt::Debug for RcHKT {
     fn fmt_k<A: ?Sized + std::fmt::Debug>(
         value: &Self::T<A>,
@@ -507,8 +519,6 @@ impl SharedPointerHKT for RcHKT {
         Rc::clone(value).using(K1::newtype)
     }
 }
-
-impl Infallible for BoxHKT {}
 
 impl HKT1Unsized for BoxHKT {
     type T<A: ?Sized> = Box<A>;

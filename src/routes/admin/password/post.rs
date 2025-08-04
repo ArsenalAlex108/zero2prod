@@ -6,12 +6,13 @@ use actix_web::{
 use argon2::{Argon2, password_hash::SaltString};
 use rand::thread_rng;
 use secrecy::{ExposeSecret, SecretString};
-use sqlx::PgPool;
 use unicode_segmentation::UnicodeSegmentation;
 use uuid::Uuid;
 
 use crate::{
     authentication::{self, UserId},
+    database::transactional::authentication::AuthenticationRepository,
+    dependency_injection::app_state::Inject,
     utils::{Pipe, see_other_response},
 };
 use argon2::PasswordHasher;
@@ -24,25 +25,27 @@ pub struct FormData<'a> {
     pub confirm_new_password: Cow<'a, SecretString>,
 }
 
-pub async fn post_reset_password(
+pub async fn post_reset_password<
+    A: AuthenticationRepository,
+>(
     user_id: web::ReqData<UserId>,
     form_data: web::Form<FormData<'_>>,
-    pool: web::Data<PgPool>,
+    authentication_repository: Inject<A>,
 ) -> Result<HttpResponse, actix_web::Error> {
     let user_id: Uuid = user_id.into_inner().into();
 
-    let salted_password = sqlx::query!(
-        "--sql
-    SELECT salted_password FROM newsletter_writers
-    WHERE user_id = $1
-    ",
-        &user_id
-    )
-    .fetch_one(pool.as_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?
-    .salted_password
-    .pipe(SecretString::from);
+    let salted_password = authentication_repository
+        .get_hashed_credentials_from_user_id(user_id)
+        .await
+        .map_err(
+            actix_web::error::ErrorInternalServerError,
+        )?
+        .map(|credentials| credentials.salted_password)
+        .ok_or_else(|| {
+            actix_web::error::ErrorNotFound(
+                "User not found",
+            )
+        })?;
 
     let new_password = form_data.0.new_password.as_ref();
     let new_password_len = new_password
@@ -96,20 +99,17 @@ pub async fn post_reset_password(
             actix_web::error::ErrorInternalServerError,
         )?;
 
-    let hash = hash.serialize();
+    let hash = hash
+        .serialize()
+        .to_string()
+        .pipe(SecretString::from);
 
-    sqlx::query!(
-        "--sql
-    UPDATE newsletter_writers SET
-    salted_password = $1
-    WHERE user_id = $2
-    ",
-        &hash.as_str(),
-        &user_id
-    )
-    .execute(pool.as_ref())
-    .await
-    .map_err(actix_web::error::ErrorInternalServerError)?;
+    authentication_repository
+        .update_password(user_id, &hash)
+        .await
+        .map_err(
+            actix_web::error::ErrorInternalServerError,
+        )?;
 
     actix_web_flash_messages::FlashMessage::info(
         "Resetted Password successfully!",

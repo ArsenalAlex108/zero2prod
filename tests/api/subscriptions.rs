@@ -1,4 +1,13 @@
-use crate::common::{self, email_server, spawn_app};
+use crate::common::{
+    self, email_server, spawn_app,
+    test_dependency_injection::test_database::{
+        get_subscriptions_repository::{
+            GetSubscriptionsRepository as _,
+            SubscriptionStatus,
+        },
+        repository_suspender::RepositorySuspender as _,
+    },
+};
 
 #[actix_rt::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
@@ -44,17 +53,19 @@ async fn subscribe_persists_new_user() {
         .expect("Failed to execute request.");
     // Assert
 
-    let saved = sqlx::query!(
-        "--sql  
-    SELECT email, name, status FROM subscriptions"
-    )
-    .fetch_one(&app.db_pool)
-    .await
-    .expect("Failed to fetch saved subscriptions.");
+    let saved = app
+        .test_app_state
+        .get_subscriptions_repository
+        .get_subscriptions("le guin")
+        .await
+        .expect("Failed to fetch saved subscriptions.");
 
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
-    assert_eq!(saved.status, "pending_confirmation");
+    assert_eq!(
+        saved.status,
+        SubscriptionStatus::PendingConfirmation
+    );
 }
 
 #[actix_rt::test]
@@ -176,13 +187,11 @@ async fn subscribe_sends_a_confirmation_email_with_a_link()
 async fn subscription_fails_after_fatal_database_error() {
     let app = spawn_app().await;
 
-    sqlx::query!(
-        "--sql
-    DROP SCHEMA public CASCADE"
-    )
-    .execute(&app.db_pool)
-    .await
-    .unwrap();
+    app.test_app_state
+        .repository_suspender
+        .suspend()
+        .await
+        .unwrap();
 
     let response = app.post_subscriptions(
         "name=le%20guin&email=ursula_le_guin%40gmail.com"

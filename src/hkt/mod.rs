@@ -5,7 +5,7 @@ mod validation;
 
 pub use archery_adapt::{
     ArcHKT, BoxHKT, HKT1Unsized, K1, RcHKT, RefHKT,
-    SharedPointerHKT, newtype,
+    SendHKT, SharedPointerHKT, SyncHKT, newtype,
 };
 pub use associative::Debug;
 pub use validation::{Validation, ValidationHKT};
