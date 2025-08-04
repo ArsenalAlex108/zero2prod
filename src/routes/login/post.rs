@@ -5,7 +5,6 @@ use actix_web::http::header::LOCATION;
 use actix_web::web;
 use nameof::name_of;
 use secrecy::SecretString;
-use sqlx::PgPool;
 
 use crate::authentication;
 use crate::authentication::BasicAuthCredentials;

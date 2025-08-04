@@ -23,7 +23,6 @@ use actix_web::{
 };
 use const_format::formatcp;
 use eyre::WrapErr;
-use std::ops::Deref;
 
 #[derive(serde::Deserialize)]
 pub struct SubscribeFormData {
@@ -121,11 +120,7 @@ pub async fn subscribe_with_shared_pointer<
                         send_confirmation_email(
                             &email_client,
                             &subscriber,
-                            base_url
-                                .deref()
-                                .deref()
-                                .0
-                                .ref_cast(),
+                            &base_url.0,
                             token.to_string().as_str(),
                         )
                         .await

@@ -44,6 +44,7 @@ impl<'a> Lift<'a> for ThinDataHKT {
 }
 
 pub trait TupleMap9<T, U, V, W, X, Y, Z, A, B> {
+    #[allow(clippy::type_complexity)]
     fn lift_map<'a, F>(
         self,
     ) -> (
@@ -69,6 +70,7 @@ pub trait TupleMap9<T, U, V, W, X, Y, Z, A, B> {
         A: 'a,
         B: 'a;
 
+    #[allow(clippy::type_complexity)]
     fn map<'a, G>(
         self,
         f: &G,
@@ -95,6 +97,7 @@ pub trait TupleMap9<T, U, V, W, X, Y, Z, A, B> {
         A: 'a,
         B: 'a;
 
+    #[allow(clippy::type_complexity)]
     fn map_mut<'a, G>(
         self,
         f: &mut G,

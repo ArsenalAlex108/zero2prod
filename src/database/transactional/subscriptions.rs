@@ -2,9 +2,8 @@ use uuid::Uuid;
 
 use crate::{
     database::transactional::unit_of_work::{
-        self, UnitOfWorkRepository,
+        UnitOfWorkRepository,
     },
-    dependency_injection::app_state::SendSyncStatic,
     domain::NewSubscriber,
     hkt::{SendHKT, SharedPointerHKT, SyncHKT},
 };

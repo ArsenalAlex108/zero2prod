@@ -138,13 +138,13 @@ pub async fn get_newsletter_sending_worker_iterator<
                     tokio::time::sleep(Duration::from_secs(
                         10,
                     ))
-                    .await
+                    .await;
                 }
                 R::Error(_) => {
                     tokio::time::sleep(Duration::from_secs(
                         1,
                     ))
-                    .await
+                    .await;
                 }
             }
         }

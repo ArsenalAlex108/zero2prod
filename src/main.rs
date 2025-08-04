@@ -1,9 +1,5 @@
 use secrecy::SecretString;
-use std::{
-    convert::Infallible,
-    fmt::{Debug, Display},
-    marker::PhantomData,
-};
+use std::fmt::{Debug, Display};
 use tokio::task::JoinError;
 
 use reqwest::Client;
@@ -13,12 +9,12 @@ use zero2prod::{
         EmailClientSettings, get_configuration,
     },
     dependency_injection::app_state::{
-        AppStateFactory, AppStateTypes,
+        AppStateFactory,
         DefaultAppStateFactory, IssueDeliveryWorkerTypes,
     },
     hkt::{SendHKT, SharedPointerHKT, SyncHKT},
     issue_delivery_worker::{
-        self, IssueDeliveryWorkerDependencyAlias,
+        self,
     },
     startup::{self, Application},
     telemetry::{get_subscriber, init_subscriber},

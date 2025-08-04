@@ -9,8 +9,6 @@ use actix_web::{
     web::{self},
 };
 
-use reqwest::Client;
-use secrecy::SecretString;
 use tracing_actix_web::TracingLogger;
 
 use crate::{
@@ -68,9 +66,6 @@ pub async fn run<
 
     let hmac_key = actix_web::cookie::Key::try_from(
         hmac_secret
-            .as_ref()
-            .as_ref()
-            .as_ref()
             .expose_secret()
             .as_bytes(),
     )

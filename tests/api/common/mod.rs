@@ -1,15 +1,12 @@
 use core::str;
 use eyre::Context;
 use once_cell::sync::Lazy;
-use reqwest::{Client, Url};
+use reqwest::Url;
 use secrecy::ExposeSecret;
 use secrecy::SecretString;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::ops::DerefMut;
 use std::{borrow::Cow, ops::Deref};
-use tokio::sync::Mutex;
 use uuid::Uuid;
-use zero2prod::database::transactional::unit_of_work::BeginUnitOfWork as _;
 use zero2prod::dependency_injection::app_state::AppState;
 use zero2prod::dependency_injection::app_state::AppStateFactory;
 use zero2prod::dependency_injection::app_state::AppStateTypes;
@@ -39,8 +36,6 @@ use argon2::{
 
 use anyhow::anyhow;
 
-use crate::common::test_dependency_injection::test_app_state;
-use crate::common::test_dependency_injection::test_app_state::get_test_app_state;
 use crate::common::test_dependency_injection::test_app_state::TestAppState;
 use crate::common::test_dependency_injection::test_app_state::TestAppStateFactory;
 use crate::common::test_dependency_injection::test_app_state::TestAppStateFactoryImpl;

@@ -1,7 +1,6 @@
 use std::{borrow::Cow, str::FromStr};
 
 use actix_web::{HttpResponse, http::StatusCode, web};
-use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::{

@@ -1,4 +1,4 @@
-use std::{future, marker::PhantomData};
+use std::marker::PhantomData;
 
 use secrecy::{ExposeSecret as _, SecretString};
 use uuid::Uuid;
@@ -69,7 +69,7 @@ impl<D: PgPoolDependencies> PgPool<D> {
         Self(pool, PhantomData)
     }
 
-    pub fn pool(&self) -> &sqlx::PgPool {
+    #[must_use] pub fn pool(&self) -> &sqlx::PgPool {
         &self.0
     }
 }

@@ -6,8 +6,9 @@ use crate::{
         newsletters::NewslettersRepository,
         persistence::{
             HeaderPairRecord, PersistenceRepository,
+            SavedResponseBody,
         },
-        unit_of_work::{BeginUnitOfWork, UnitOfWork as _},
+        unit_of_work::{BeginUnitOfWork, UnitOfWork},
     },
     dependency_injection::app_state::Inject,
     hkt::SharedPointerHKT,
@@ -108,6 +109,93 @@ pub async fn publish_newsletter<
     .await
 }
 
+fn restore_saved_response(
+    saved_response: SavedResponseBody,
+) -> Result<HttpResponse, actix_web::Error> {
+    success().send();
+
+    let status_code = StatusCode::from_u16(
+        saved_response.response_status_code,
+    )
+    .map_err(|e| {
+        InternalError::from_response(
+            e,
+            HttpResponse::build(
+                StatusCode::INTERNAL_SERVER_ERROR,
+            )
+            .finish(),
+        )
+    })?;
+    let mut response = HttpResponse::build(status_code);
+    for HeaderPairRecord { name, value } in
+        saved_response.response_headers
+    {
+        response.append_header((name, value));
+    }
+
+    Ok(response.body(saved_response.response_body))
+}
+
+async fn persist_response<
+    P: PersistenceRepository<UnitOfWork = U>,
+    U: UnitOfWork,
+>(
+    persistence_repository: &P,
+    unit_of_work: &mut U,
+    user_id: UserId,
+    idempotency_key: &IdempotencyKey<'_>,
+) -> Result<
+    HttpResponse<actix_web::body::BoxBody>,
+    actix_web::Error,
+> {
+    let http_response =
+        see_other_response("/admin/newsletters");
+
+    let status_code = http_response.status().as_u16();
+
+    let (headers_response, body) =
+        http_response.into_parts();
+
+    let headers = headers_response
+        .headers()
+        .iter()
+        .map(|pair| {
+            let (name, value) = pair;
+            let name = name.as_str().to_owned();
+            let value = value.as_bytes().to_owned();
+            HeaderPairRecord { name, value }
+        })
+        .collect::<Vec<_>>();
+
+    let body = actix_web::body::to_bytes(body)
+        .await
+        .map_err(|e| {
+            InternalError::from_response(
+                e,
+                HttpResponse::build(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                )
+                .finish(),
+            )
+        })?;
+
+    persistence_repository
+        .save_response_body(
+            unit_of_work,
+            user_id.into(),
+            idempotency_key,
+            status_code,
+            headers,
+            body.iter().as_slice(),
+        )
+        .await
+        .map_err(redirect_to_self_with_err)?;
+
+    Ok(headers_response
+        .set_body(body)
+        .map_into_boxed_body())
+}
+
 #[tracing::instrument(
     name = "Publishing Newsletter To Confirmed Subscribers (Generic)",
     skip(
@@ -193,31 +281,7 @@ where
             redirect_to_self_with_err(e.into_owned())
         })?
     {
-        success().send();
-
-        let status_code = StatusCode::from_u16(
-            saved_response
-                .response_status_code
-                .try_into()?,
-        )
-        .map_err(|e| {
-            InternalError::from_response(
-                e,
-                HttpResponse::build(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                )
-                .finish(),
-            )
-        })?;
-        let mut response = HttpResponse::build(status_code);
-        for HeaderPairRecord { name, value } in
-            saved_response.response_headers
-        {
-            response.append_header((name, value));
-        }
-        return Ok(
-            response.body(saved_response.response_body)
-        );
+        return restore_saved_response(saved_response);
     }
 
     let issue_id = newsletters_repository
@@ -235,48 +299,14 @@ where
         .await
         .map_err(redirect_to_self_with_err)?;
 
-    let http_response =
-        see_other_response("/admin/newsletters");
-
-    let status_code = http_response.status().as_u16();
-
-    let (headers_response, body) =
-        http_response.into_parts();
-
-    let headers = headers_response
-        .headers()
-        .iter()
-        .map(|pair| {
-            let (name, value) = pair;
-            let name = name.as_str().to_owned();
-            let value = value.as_bytes().to_owned();
-            HeaderPairRecord { name, value }
-        })
-        .collect::<Vec<_>>();
-
-    let body = actix_web::body::to_bytes(body)
-        .await
-        .map_err(|e| {
-            InternalError::from_response(
-                e,
-                HttpResponse::build(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                )
-                .finish(),
-            )
-        })?;
-
-    persistence_repository
-        .save_response_body(
-            &mut unit_of_work,
-            user_id,
-            &idempotency_key,
-            status_code,
-            headers,
-            body.iter().as_slice(),
-        )
-        .await
-        .map_err(redirect_to_self_with_err)?;
+    let headers_response = persist_response(
+        &*persistence_repository,
+        &mut unit_of_work,
+        user_id.into(),
+        &idempotency_key,
+    )
+    .await
+    .map_err(redirect_to_self_with_err)?;
 
     unit_of_work
         .commit()
@@ -285,10 +315,7 @@ where
 
     success().send();
 
-    headers_response
-        .set_body(body)
-        .map_into_boxed_body()
-        .pipe(Ok)
+    headers_response.pipe(Ok)
 }
 
 pub const SUCCESS_MESSAGE: &str = "Newsletter has been successfully enqueued & \
