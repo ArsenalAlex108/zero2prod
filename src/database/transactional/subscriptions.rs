@@ -1,9 +1,7 @@
 use uuid::Uuid;
 
 use crate::{
-    database::transactional::unit_of_work::{
-        UnitOfWorkRepository,
-    },
+    database::transactional::unit_of_work::UnitOfWorkRepository,
     domain::NewSubscriber,
     hkt::{SendHKT, SharedPointerHKT, SyncHKT},
 };

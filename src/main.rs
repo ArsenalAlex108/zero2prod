@@ -9,13 +9,11 @@ use zero2prod::{
         EmailClientSettings, get_configuration,
     },
     dependency_injection::app_state::{
-        AppStateFactory,
-        DefaultAppStateFactory, IssueDeliveryWorkerTypes,
+        AppStateFactory, DefaultAppStateFactory,
+        IssueDeliveryWorkerTypes,
     },
     hkt::{SendHKT, SharedPointerHKT, SyncHKT},
-    issue_delivery_worker::{
-        self,
-    },
+    issue_delivery_worker::{self},
     startup::{self, Application},
     telemetry::{get_subscriber, init_subscriber},
     utils::Pipe,

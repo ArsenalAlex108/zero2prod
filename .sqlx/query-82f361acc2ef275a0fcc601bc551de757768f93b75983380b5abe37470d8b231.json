@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "--sql\n        UPDATE newsletter_writers SET\n        salted_password = $1\n        WHERE user_id = $2\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "82f361acc2ef275a0fcc601bc551de757768f93b75983380b5abe37470d8b231"
+}

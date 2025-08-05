@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "--sql\n        SELECT\n        response_status_code,\n        response_headers as \"response_headers: Vec<HeaderPairRecord>\",\n        response_body\n        FROM idempotency\n        WHERE\n        user_id = $1 AND\n        idempotency_key = $2\n        ",
+  "query": "--sql\n            SELECT\n            response_status_code,\n            response_headers as \"response_headers: Vec<SqlxHeaderPairRecord>\",\n            response_body\n            FROM idempotency\n            WHERE\n            user_id = $1 AND\n            idempotency_key = $2\n            ",
   "describe": {
     "columns": [
       {
@@ -10,7 +10,7 @@
       },
       {
         "ordinal": 1,
-        "name": "response_headers: Vec<HeaderPairRecord>",
+        "name": "response_headers: Vec<SqlxHeaderPairRecord>",
         "type_info": {
           "Custom": {
             "name": "header_pair[]",
@@ -54,5 +54,5 @@
       false
     ]
   },
-  "hash": "078cb8526b6977a392a782f96b1ca6483e78c5d3247ee49b365ae7dfafc33bac"
+  "hash": "e6ec1b77ee0ee8c7b75c546e1bfd640afa158a8b0bb00c30270aadd1d6250cdb"
 }

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "--sql\n            INSERT INTO newsletter_writers (user_id, username, salted_password) \n            VALUES ($1, $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f606ad25a2a383344a0b4191903068d7e58e87c5fc213e0398b036e17d574edc"
+}

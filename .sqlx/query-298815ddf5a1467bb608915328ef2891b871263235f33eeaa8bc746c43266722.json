@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "--sql\n            SELECT newsletter_issue_id as \"newsletter_issue_id!\"\n            FROM get_available_issue_delivery_queue($1)\n            FOR UPDATE\n            SKIP LOCKED\n            LIMIT 1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "newsletter_issue_id!",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "298815ddf5a1467bb608915328ef2891b871263235f33eeaa8bc746c43266722"
+}

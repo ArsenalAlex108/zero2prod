@@ -1,0 +1,34 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "--sql\n            SELECT user_id, username, salted_password\n            FROM newsletter_writers\n            WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "username",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "salted_password",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "793d330f12b0ae1c37ac394f759ba825ce0ba091ca5888028c24c556fd83598b"
+}

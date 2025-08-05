@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT email, name, status FROM subscriptions",
+  "query": "SELECT email, name, status FROM subscriptions WHERE name = $1",
   "describe": {
     "columns": [
       {
@@ -20,7 +20,9 @@
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Text"
+      ]
     },
     "nullable": [
       false,
@@ -28,5 +30,5 @@
       false
     ]
   },
-  "hash": "9ab6536d2bf619381573b3bf13507d53b2e9cf50051e51c803e916f25b51abd2"
+  "hash": "0206daed4b0dc7d170af9a3e29496d8e6e8bc15ee5abc6812b37a8582b98b17f"
 }

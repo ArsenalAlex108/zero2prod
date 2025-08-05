@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "--sql\n            UPDATE issue_delivery_queue\n            SET n_retries = n_retries + 1,\n                execute_after = execute_after * 1.5\n            WHERE newsletter_issue_id = $1\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "653add67bfbc8d3be74f724be3a77d21f01aadfd60cd26e8999e8eee5bf95d08"
+}

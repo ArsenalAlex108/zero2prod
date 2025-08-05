@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "--sql\n    INSERT INTO idempotency (\n        user_id,\n        idempotency_key,\n        response_status_code,\n        response_headers,\n        response_body,\n        created_at\n    )\n    VALUES ($1, $2, $3, $4, $5, now())\n    ",
+  "query": "--sql\n            INSERT INTO idempotency (user_id, idempotency_key, response_status_code, response_headers, response_body, created_at)\n            VALUES ($1, $2, $3, $4, $5, $6)\n            ",
   "describe": {
     "columns": [],
     "parameters": {
@@ -32,10 +32,11 @@
             }
           }
         },
-        "Bytea"
+        "Bytea",
+        "Timestamptz"
       ]
     },
     "nullable": []
   },
-  "hash": "e1def5b468711f30f98100fb933483afd52d92b339659f426cfd03a0aff7a0c6"
+  "hash": "94cbe6826a788aa65385a6e6db6655e1a90c41ffcf7e00da7a27ede20c391af6"
 }

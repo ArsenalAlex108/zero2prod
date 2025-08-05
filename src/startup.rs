@@ -65,9 +65,7 @@ pub async fn run<
     let hmac_secret = hmac_secret.pipe(web::Data::new);
 
     let hmac_key = actix_web::cookie::Key::try_from(
-        hmac_secret
-            .expose_secret()
-            .as_bytes(),
+        hmac_secret.expose_secret().as_bytes(),
     )
     .expect("HmacSecret is valid key.");
 

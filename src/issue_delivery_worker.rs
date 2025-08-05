@@ -135,15 +135,15 @@ pub async fn get_newsletter_sending_worker_iterator<
             match task_result.await {
                 R::Completed => (),
                 R::NothingFound => {
-                    tokio::time::sleep(Duration::from_secs(
-                        10,
-                    ))
+                    tokio::time::sleep(
+                        Duration::from_secs(10),
+                    )
                     .await;
                 }
                 R::Error(_) => {
-                    tokio::time::sleep(Duration::from_secs(
-                        1,
-                    ))
+                    tokio::time::sleep(
+                        Duration::from_secs(1),
+                    )
                     .await;
                 }
             }

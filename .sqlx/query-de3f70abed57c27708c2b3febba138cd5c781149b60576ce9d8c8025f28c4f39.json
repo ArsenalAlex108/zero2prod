@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "--sql\n            DROP SCHEMA public CASCADE",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "de3f70abed57c27708c2b3febba138cd5c781149b60576ce9d8c8025f28c4f39"
+}

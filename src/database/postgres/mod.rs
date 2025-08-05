@@ -69,7 +69,8 @@ impl<D: PgPoolDependencies> PgPool<D> {
         Self(pool, PhantomData)
     }
 
-    #[must_use] pub fn pool(&self) -> &sqlx::PgPool {
+    #[must_use]
+    pub fn pool(&self) -> &sqlx::PgPool {
         &self.0
     }
 }
