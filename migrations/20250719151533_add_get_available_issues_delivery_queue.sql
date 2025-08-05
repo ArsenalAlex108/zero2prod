@@ -15,7 +15,7 @@ FROM
     INNER JOIN issue_delivery_queue
     ON newsletter_issues.newsletter_issue_id 
         = issue_delivery_queue.newsletter_issue_id
-)
+) AS my_alias
 WHERE enabled = true
 AND execute_after >= $1 - published_at;
 ' LANGUAGE SQL;
