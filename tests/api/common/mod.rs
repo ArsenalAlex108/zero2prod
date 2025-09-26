@@ -486,14 +486,13 @@ pub fn hash_password<'a>(
     salt: &'a SaltString,
 ) -> PasswordHash<'a> {
     let hasher = Argon2::default();
-    let hash = hasher
+
+    hasher
         .hash_password(
             password.expose_secret().as_bytes(),
             salt,
         )
-        .unwrap();
-
-    hash
+        .unwrap()
 }
 
 pub fn assert_is_redirect_to(

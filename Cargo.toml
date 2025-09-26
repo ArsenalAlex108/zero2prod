@@ -18,7 +18,7 @@ chrono = "0.4.41"
 config = "0.15.11"
 const_format = "0.2.34"
 # delegate = "0.13.3"
-derive_more = { version = "2.0.1", features = ["into", "constructor"] }
+derive_more = { version = "2.0.1", features = ["into", "constructor", "try_into"] }
 futures = "0.3.31"
 kust = "0.0.2"
 naan = "0.1.32"
