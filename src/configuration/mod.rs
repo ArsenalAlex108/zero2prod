@@ -16,14 +16,12 @@ use crate::hkt::{
 };
 use crate::utils::Pipe;
 
-#[allow(clippy::pedantic)]
-pub mod generated;
-
 const APP_ENVIRONMENT: &str = name_of!(APP_ENVIRONMENT);
 
 // TODO: Add Redis URI.
-//#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize)]
 #[derive(derive_more::Constructor)]
+#[serde(bound(deserialize = "P: RefHKT"))]
 pub struct Settings<P: HKT1Unsized> {
     pub database: K1<P, DatabaseSettings<P>>,
     pub application: K1<P, ApplicationSettings<P>>,
@@ -40,13 +38,16 @@ impl<P: SharedPointerHKT> Clone for Settings<P> {
     }
 }
 
+
+#[derive(serde::Deserialize)]
 #[derive(derive_more::Constructor)]
+#[serde(bound(deserialize = "P: RefHKT"))]
 pub struct DatabaseSettings<P: HKT1Unsized> {
     pub username: K1<P, str>,
     pub password: K1<P, str>,
-    // #[serde(
-    //     deserialize_with = "deserialize_number_from_string"
-    // )]
+    #[serde(
+        deserialize_with = "deserialize_number_from_string"
+    )]
     pub port: u16,
     pub host: K1<P, str>,
     pub database_name: K1<P, str>,
@@ -66,8 +67,9 @@ impl<P: SharedPointerHKT> Clone for DatabaseSettings<P> {
     }
 }
 
-//#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize)]
 #[derive(derive_more::Constructor)]
+#[serde(bound(deserialize = "P: RefHKT"))]
 pub struct ApplicationSettings<P: HKT1Unsized> {
     // #[serde(
     //     deserialize_with = "deserialize_number_from_string"
@@ -89,8 +91,9 @@ impl<P: SharedPointerHKT> Clone for ApplicationSettings<P> {
     }
 }
 
-//#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize)]
 #[derive(derive_more::Constructor)]
+#[serde(bound(deserialize = "P: RefHKT"))]
 pub struct EmailClientSettings<P: HKT1Unsized> {
     pub base_url: K1<P, str>,
     pub sender_email: K1<P, str>,
@@ -140,13 +143,14 @@ impl<P: SharedPointerHKT> Clone for EmailClientSettings<P> {
     }
 }
 
-//#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize)]
 #[derive(
     derive_more::Deref,
     derive_more::AsRef,
     derive_more::From,
     derive_more::Into,
 )]
+#[serde(bound(deserialize = "P: RefHKT"))]
 pub struct HmacSecret<P: HKT1Unsized>(
     pub K1<P, SecretString>,
 );
